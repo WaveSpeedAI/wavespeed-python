@@ -1,0 +1,90 @@
+name: python-packages
+
+on:
+  # https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#running-a-workflow-when-a-pull-request-is-approved
+  # pull_request:
+  #   types:
+  #     - review_requested
+  #   branches:
+  #     - main
+  push:
+    branches:
+      - main
+    tags:
+      - "v[0-9]+*"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Recursive checkout
+      uses: actions/checkout@v3
+      with:
+        submodules: recursive
+        path: "."
+        fetch-depth: 0 # for tags
+
+    - name: Set up Python
+      uses: actions/setup-python@v3
+      with:
+        python-version: '3.x'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install build wheel 'setuptools>=64' 'setuptools_scm>=8'
+
+    - name: Build package
+      run: python -m build
+
+    - run: du -h dist/*
+    - uses: actions/upload-artifact@v4
+      with:
+        name: python-packages
+        path: |
+          dist/*.whl
+          dist/*.tar.gz
+
+  # publish to GitHub Release
+  gh_release:
+    name: gh_release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions: write-all
+
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - run: ls -R dist/
+
+      # create night release if it's a push to main
+      - if: github.repository == 'WaveSpeedAI/wavespeed-python' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        name: Nightly Release
+        uses: andelf/nightly-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: nightly
+          name: 'Nightly Release $$'
+          prerelease: true
+          body: 'TODO: Add nightly release notes'
+          files: |
+            dist/*/*.whl
+            dist/*/*.tar.gz
+
+      # create release if it's a tag like vx.y.z
+      - if: github.repository == 'WaveSpeedAI/wavespeed-python' && github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/v')
+        name: Release
+        uses: softprops/action-gh-release@v1
+        with :
+          files: |
+            dist/*/*.whl
+            dist/*/*.tar.gz
