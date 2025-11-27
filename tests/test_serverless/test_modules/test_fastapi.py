@@ -1,12 +1,11 @@
 """Tests for the FastAPI server module."""
 
 import unittest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
-import pytest
 from fastapi.testclient import TestClient
 
-from wavespeed.serverless.modules.fastapi import WorkerAPI, _pending_jobs, _job_results
+from wavespeed.serverless.modules.fastapi import _job_results, _pending_jobs, WorkerAPI
 
 
 class TestWorkerAPI(unittest.TestCase):
@@ -416,6 +415,7 @@ class TestWebhook(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         # Give the thread a moment to start
         import time
+
         time.sleep(0.1)
         # Webhook should have been called (in a thread)
         # Note: Due to threading, we may need to wait or use different assertion

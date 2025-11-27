@@ -2,7 +2,7 @@
 
 import unittest
 from argparse import Namespace
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from wavespeed.serverless.worker import _is_local, run_worker
 
@@ -21,9 +21,7 @@ class TestIsLocal(unittest.TestCase):
         """Test _is_local returns True when no job endpoint is configured."""
         config = {"_args": None}
 
-        with patch(
-            "wavespeed.serverless.worker.get_serverless_env"
-        ) as mock_env:
+        with patch("wavespeed.serverless.worker.get_serverless_env") as mock_env:
             mock_env.return_value = None  # No job endpoint
 
             self.assertTrue(_is_local(config))
@@ -32,9 +30,7 @@ class TestIsLocal(unittest.TestCase):
         """Test _is_local returns False when job endpoint is configured."""
         config = {"_args": None}
 
-        with patch(
-            "wavespeed.serverless.worker.get_serverless_env"
-        ) as mock_env:
+        with patch("wavespeed.serverless.worker.get_serverless_env") as mock_env:
             mock_env.return_value = "http://test.endpoint/jobs"
 
             self.assertFalse(_is_local(config))
@@ -44,9 +40,7 @@ class TestIsLocal(unittest.TestCase):
         args = Namespace(test_input='{"input": {}}')
         config = {"_args": args}
 
-        with patch(
-            "wavespeed.serverless.worker.get_serverless_env"
-        ) as mock_env:
+        with patch("wavespeed.serverless.worker.get_serverless_env") as mock_env:
             mock_env.return_value = "http://test.endpoint/jobs"
 
             # Even with endpoint set, test_input should make it local
@@ -67,9 +61,7 @@ class TestRunWorker(unittest.TestCase):
             "_args": Namespace(test_input='{"input": {}}'),
         }
 
-        with patch(
-            "wavespeed.serverless.worker.run_local"
-        ) as mock_run_local, patch(
+        with patch("wavespeed.serverless.worker.run_local") as mock_run_local, patch(
             "wavespeed.serverless.worker.log"
         ):
             run_worker(config)
@@ -87,9 +79,7 @@ class TestRunWorker(unittest.TestCase):
             "_args": None,
         }
 
-        with patch(
-            "wavespeed.serverless.worker.get_serverless_env"
-        ) as mock_env, patch(
+        with patch("wavespeed.serverless.worker.get_serverless_env") as mock_env, patch(
             "wavespeed.serverless.worker.Heartbeat"
         ) as mock_heartbeat, patch(
             "wavespeed.serverless.worker.JobScaler"
@@ -125,9 +115,7 @@ class TestRunWorker(unittest.TestCase):
             "_args": None,
         }
 
-        with patch(
-            "wavespeed.serverless.worker.get_serverless_env"
-        ) as mock_env, patch(
+        with patch("wavespeed.serverless.worker.get_serverless_env") as mock_env, patch(
             "wavespeed.serverless.worker.Heartbeat"
         ) as mock_heartbeat, patch(
             "wavespeed.serverless.worker.JobScaler"
@@ -163,9 +151,7 @@ class TestRunWorker(unittest.TestCase):
             "_args": None,
         }
 
-        with patch(
-            "wavespeed.serverless.worker.get_serverless_env"
-        ) as mock_env, patch(
+        with patch("wavespeed.serverless.worker.get_serverless_env") as mock_env, patch(
             "wavespeed.serverless.worker.Heartbeat"
         ) as mock_heartbeat, patch(
             "wavespeed.serverless.worker.JobScaler"

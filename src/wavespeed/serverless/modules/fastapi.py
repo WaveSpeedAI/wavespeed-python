@@ -4,7 +4,7 @@ import asyncio
 import threading
 import uuid
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 import aiohttp
 import uvicorn
@@ -13,8 +13,8 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import RedirectResponse
 
 from .handler import is_async_generator, is_generator, is_sync_generator
-from .job import run_job
 from .heartbeat import Heartbeat
+from .job import run_job
 from .logger import log
 from .state import Job, JobsProgress
 
@@ -302,11 +302,13 @@ class WorkerAPI:
             job_output = await run_job(handler, job)
 
         if job_output.get("error"):
-            return jsonable_encoder({
-                "id": job_id,
-                "status": "FAILED",
-                "error": job_output["error"],
-            })
+            return jsonable_encoder(
+                {
+                    "id": job_id,
+                    "status": "FAILED",
+                    "error": job_output["error"],
+                }
+            )
 
         # Send webhook if provided
         if job_request.webhook:
@@ -317,31 +319,37 @@ class WorkerAPI:
             )
             thread.start()
 
-        return jsonable_encoder({
-            "id": job_id,
-            "status": "COMPLETED",
-            "output": job_output.get("output"),
-        })
+        return jsonable_encoder(
+            {
+                "id": job_id,
+                "status": "COMPLETED",
+                "output": job_output.get("output"),
+            }
+        )
 
     async def _stream(self, job_id: str) -> Dict[str, Any]:
         """Get streaming job output."""
         if job_id not in _pending_jobs:
-            return jsonable_encoder({
-                "id": job_id,
-                "status": "FAILED",
-                "error": "Job ID not found",
-            })
+            return jsonable_encoder(
+                {
+                    "id": job_id,
+                    "status": "FAILED",
+                    "error": "Job ID not found",
+                }
+            )
 
         pending = _pending_jobs[job_id]
         job_input = {"id": job_id, "input": pending["input"]}
         handler = self.config["handler"]
 
         if not is_generator(handler):
-            return jsonable_encoder({
-                "id": job_id,
-                "status": "FAILED",
-                "error": "Stream not supported, handler must be a generator.",
-            })
+            return jsonable_encoder(
+                {
+                    "id": job_id,
+                    "status": "FAILED",
+                    "error": "Stream not supported, handler must be a generator.",
+                }
+            )
 
         job_output = await self._run_generator(handler, job_input)
 
@@ -349,11 +357,13 @@ class WorkerAPI:
         del _pending_jobs[job_id]
 
         if job_output.get("error"):
-            return jsonable_encoder({
-                "id": job_id,
-                "status": "FAILED",
-                "error": job_output["error"],
-            })
+            return jsonable_encoder(
+                {
+                    "id": job_id,
+                    "status": "FAILED",
+                    "error": job_output["error"],
+                }
+            )
 
         # Format stream output
         stream_output = [{"output": item} for item in job_output.get("output", [])]
@@ -367,11 +377,13 @@ class WorkerAPI:
             )
             thread.start()
 
-        return jsonable_encoder({
-            "id": job_id,
-            "status": "COMPLETED",
-            "stream": stream_output,
-        })
+        return jsonable_encoder(
+            {
+                "id": job_id,
+                "status": "COMPLETED",
+                "stream": stream_output,
+            }
+        )
 
     async def _status(self, job_id: str) -> Dict[str, Any]:
         """Check job status and get output."""
@@ -380,11 +392,13 @@ class WorkerAPI:
             if job_id in _job_results:
                 return jsonable_encoder(_job_results[job_id])
 
-            return jsonable_encoder({
-                "id": job_id,
-                "status": "FAILED",
-                "error": "Job ID not found",
-            })
+            return jsonable_encoder(
+                {
+                    "id": job_id,
+                    "status": "FAILED",
+                    "error": "Job ID not found",
+                }
+            )
 
         pending = _pending_jobs[job_id]
         job = Job(id=job_id, input=pending["input"])

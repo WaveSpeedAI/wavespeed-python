@@ -1,6 +1,5 @@
 """Worker loop orchestration for the serverless worker."""
 
-import os
 from typing import Any, Dict
 
 from wavespeed.config import get_serverless_env
@@ -9,7 +8,6 @@ from .modules.heartbeat import Heartbeat
 from .modules.local import run_local
 from .modules.logger import log
 from .modules.scaler import JobScaler
-from .modules.state import is_local_test
 
 
 def _is_local(config: Dict[str, Any]) -> bool:

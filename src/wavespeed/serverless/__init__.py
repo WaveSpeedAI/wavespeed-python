@@ -15,7 +15,7 @@ Example usage:
 import argparse
 import signal
 import sys
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Dict
 
 from wavespeed.config import detect_serverless_env, load_runpod_serverless_config
 

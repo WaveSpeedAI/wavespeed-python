@@ -1,8 +1,7 @@
 """Progress update module for the serverless worker."""
 
-import asyncio
 import threading
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 import aiohttp
 import requests

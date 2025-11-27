@@ -3,14 +3,13 @@
 import os
 import unittest
 from pathlib import Path
-from unittest import IsolatedAsyncioTestCase
 
 from wavespeed.serverless.modules.state import (
+    get_jobs_progress,
+    get_worker_id,
     Job,
     JobsProgress,
-    get_worker_id,
     set_worker_id,
-    get_jobs_progress,
 )
 
 
@@ -183,7 +182,6 @@ class TestJobsProgress(unittest.TestCase):
 
         self.jobs.clear()
         self.assertEqual(len(self.jobs), 0)
-
 
 
 class TestGetJobsProgress(unittest.TestCase):

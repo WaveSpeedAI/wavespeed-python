@@ -2,17 +2,13 @@
 
 import asyncio
 import signal
-import sys
-import time
 from typing import Any, Callable, Dict, Optional
 
 import aiohttp
 
-from wavespeed.config import get_serverless_env
-
 from .job import get_job, handle_job
 from .logger import log
-from .state import Job, get_jobs_progress, ref_count_zero
+from .state import Job
 
 
 class JobScaler:
@@ -67,7 +63,7 @@ class JobScaler:
             log.info("Scaler interrupted")
 
     async def run(self) -> None:
-        """Main async run loop.
+        """Run the job fetching and processing tasks.
 
         Creates and runs the job fetching and processing tasks.
         """
@@ -179,7 +175,7 @@ class JobScaler:
         session: aiohttp.ClientSession,
         job: Job,
     ) -> None:
-        """Wrapper for handling a job with error handling.
+        """Handle a job with error handling.
 
         Args:
             session: The aiohttp client session.

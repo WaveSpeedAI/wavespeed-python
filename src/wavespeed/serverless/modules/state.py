@@ -1,9 +1,7 @@
 """Global state management for the serverless worker."""
 
-import os
-import time
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Dict, Optional, Set
 
 from wavespeed.config import get_serverless_env

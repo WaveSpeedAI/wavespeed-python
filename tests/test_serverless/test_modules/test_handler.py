@@ -3,11 +3,11 @@
 import unittest
 
 from wavespeed.serverless.modules.handler import (
-    is_generator,
+    get_handler_type,
     is_async,
     is_async_generator,
+    is_generator,
     is_sync_generator,
-    get_handler_type,
 )
 
 

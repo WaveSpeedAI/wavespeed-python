@@ -1,3 +1,5 @@
+"""Configuration module for WaveSpeed SDK."""
+
 import os
 import sys
 from typing import Optional

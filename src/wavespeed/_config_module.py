@@ -9,8 +9,9 @@ import unittest
 import warnings
 from types import FunctionType, ModuleType
 from typing import Any, Callable, Dict, NoReturn, Optional, Set, Union
-from typing_extensions import deprecated
 from unittest import mock
+
+from typing_extensions import deprecated
 
 
 # Types saved/loaded in configs
@@ -18,10 +19,10 @@ CONFIG_TYPES = (int, float, bool, type(None), str, list, set, tuple, dict)
 
 
 def install_config_module(module: ModuleType) -> None:
-    """
-    Converts a module-level config into a `ConfigModule()`.
+    """Convert a module-level config into a ConfigModule().
 
-    See _config_typing.pyi for instructions on how to get the converted module to typecheck.
+    See _config_typing.pyi for instructions on how to get the converted
+    module to typecheck.
     """
 
     class ConfigModuleInstance(ConfigModule):
@@ -32,7 +33,7 @@ def install_config_module(module: ModuleType) -> None:
         dest: Union[ModuleType, SubConfigProxy],
         prefix: str,
     ) -> None:
-        """Walk the module structure and move everything to module._config"""
+        """Walk the module structure and move everything to module._config."""
         for key, value in list(source.__dict__.items()):
             if (
                 key.startswith("__")
@@ -77,8 +78,8 @@ def install_config_module(module: ModuleType) -> None:
 COMPILE_IGNORED_MARKER = "@compile_ignored"
 
 
-# Gets all the keys (i.e. assignments) with a @compile_ignored comment
 def get_assignments_with_compile_ignored_comments(module: ModuleType) -> Set[str]:
+    """Get all keys (assignments) with a @compile_ignored comment."""
     source_code = inspect.getsource(module)
     assignments = set()
 
@@ -117,7 +118,10 @@ def get_assignments_with_compile_ignored_comments(module: ModuleType) -> Set[str
 
 
 class ConfigModule(ModuleType):
-    # NOTE: This should be kept in sync with _config_typing.pyi.
+    """Configuration module that wraps module-level settings.
+
+    NOTE: This should be kept in sync with _config_typing.pyi.
+    """
 
     # The default values of the configuration settings.  This can be used to
     # determine if the config has been changed or not.
@@ -133,11 +137,13 @@ class ConfigModule(ModuleType):
     _hash_digest: Optional[bytes]
 
     def __init__(self) -> None:
+        """Raise error - use install_config_module instead."""
         raise NotImplementedError(
             f"use {__name__}.install_config_module(sys.modules[__name__])"
         )
 
     def __setattr__(self, name: str, value: object) -> None:
+        """Set a configuration attribute."""
         if name in self._bypass_keys:
             super().__setattr__(name, value)
         elif name not in self._allowed_keys:
@@ -146,6 +152,7 @@ class ConfigModule(ModuleType):
             self._config[name] = value
 
     def __getattr__(self, name: str) -> Any:
+        """Get a configuration attribute."""
         try:
             return self._config[name]
         except KeyError as e:
@@ -153,19 +160,20 @@ class ConfigModule(ModuleType):
             raise AttributeError(f"{self.__name__}.{name} does not exist") from e
 
     def __delattr__(self, name: str) -> None:
+        """Delete a configuration attribute."""
         # must support delete because unittest.mock.patch deletes
         # then recreate things
         del self._config[name]
 
     def save_config(self) -> bytes:
-        """Convert config to a pickled blob"""
+        """Convert config to a pickled blob."""
         config = dict(self._config)
         for key in config.get("_save_config_ignore", ()):
             config.pop(key)
         return pickle.dumps(config, protocol=2)
 
     def save_config_portable(self) -> Dict[str, Any]:
-        """Convert config to portable format"""
+        """Convert config to portable format."""
         config: Dict[str, Any] = {}
         for key in sorted(self._config):
             if key.startswith("_"):
@@ -179,6 +187,7 @@ class ConfigModule(ModuleType):
 
     def codegen_config(self) -> str:
         """Convert config to Python statements that replicate current config.
+
         This does NOT include config settings that are at default values.
         """
         lines = []
@@ -194,7 +203,7 @@ class ConfigModule(ModuleType):
         return "\n".join(lines)
 
     def get_hash(self) -> bytes:
-        """Hashes the configs that are not compile_ignored"""
+        """Hash the configs that are not compile_ignored."""
         if self._is_dirty or self._hash_digest is None:
             dict_to_hash = {
                 k: v
@@ -212,13 +221,15 @@ class ConfigModule(ModuleType):
         category=FutureWarning,
     )
     def to_dict(self) -> Dict[str, Any]:
+        """Return a shallow copy of the config dict."""
         return self.shallow_copy_dict()
 
     def shallow_copy_dict(self) -> Dict[str, Any]:
+        """Return a shallow copy of the config dict."""
         return {**self._config}
 
     def load_config(self, maybe_pickled_config: Union[bytes, Dict[str, Any]]) -> None:
-        """Restore from a prior call to save_config() or shallow_copy_dict()"""
+        """Restore from a prior call to save_config() or shallow_copy_dict()."""
         if not isinstance(maybe_pickled_config, dict):
             config = pickle.loads(maybe_pickled_config)
         else:
@@ -226,6 +237,7 @@ class ConfigModule(ModuleType):
         self._config.update(config)
 
     def get_config_copy(self) -> Dict[str, Any]:
+        """Return a deep copy of the config dict."""
         return copy.deepcopy(self._config)
 
     def patch(
@@ -234,8 +246,7 @@ class ConfigModule(ModuleType):
         arg2: Any = None,
         **kwargs: Dict[str, Any],
     ) -> "ContextDecorator":
-        """
-        Decorator and/or context manager to make temporary changes to a config.
+        """Make temporary changes to config as decorator or context manager.
 
         As a decorator:
 
@@ -290,8 +301,7 @@ class ConfigModule(ModuleType):
         return ConfigPatch()
 
     def _make_closure_patcher(self, **changes: Dict[str, Any]) -> Any:
-        """
-        A lower-overhead version of patch() for things on the critical path.
+        """Create a lower-overhead patcher for critical path usage.
 
         Usage:
 
@@ -322,18 +332,18 @@ class ConfigModule(ModuleType):
 
 
 class ContextDecorator(contextlib.ContextDecorator):
-    """
-    Same as contextlib.ContextDecorator, but with support for
-    `unittest.TestCase`
-    """
+    """Context decorator with support for unittest.TestCase."""
 
     def __enter__(self) -> None:
+        """Enter the context."""
         raise NotImplementedError("NYI")
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> NoReturn:  # type: ignore[no-untyped-def]
+        """Exit the context."""
         raise NotImplementedError("NYI")
 
     def __call__(self, func: Callable[[Any], Any]) -> Any:
+        """Call the decorator on a function or test class."""
         if isinstance(func, type) and issubclass(func, unittest.TestCase):
 
             class _TestCase(func):  # type: ignore[valid-type, misc]
@@ -363,30 +373,32 @@ class ContextDecorator(contextlib.ContextDecorator):
 
 
 class SubConfigProxy:
-    """
-    Shim to redirect to main config.
-    `config.triton.cudagraphs` maps to _config["triton.cudagraphs"]
+    """Shim to redirect to main config.
+
+    For example, `config.triton.cudagraphs` maps to _config["triton.cudagraphs"].
     """
 
     def __init__(self, config: object, prefix: str):
+        """Initialize the proxy with a config and prefix."""
         # `super().__setattr__` to bypass custom `__setattr__`
         super().__setattr__("_config", config)
         super().__setattr__("_prefix", prefix)
 
     def __setattr__(self, name: str, value: object) -> None:
+        """Set a configuration attribute."""
         return self._config.__setattr__(self._prefix + name, value)
 
     def __getattr__(self, name: str) -> Any:
+        """Get a configuration attribute."""
         return self._config.__getattr__(self._prefix + name)
 
     def __delattr__(self, name: str) -> None:
+        """Delete a configuration attribute."""
         return self._config.__delattr__(self._prefix + name)
 
 
 def patch_object(obj: object, name: str, value: object) -> object:
-    """
-    Workaround `mock.patch.object` issue with ConfigModule
-    """
+    """Work around mock.patch.object issue with ConfigModule."""
     if isinstance(obj, ConfigModule):
         return obj.patch(name, value)
     return mock.patch.object(obj, name, value)

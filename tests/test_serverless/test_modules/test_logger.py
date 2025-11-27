@@ -2,15 +2,10 @@
 
 import io
 import json
-import sys
 import unittest
 from unittest.mock import patch
 
-from wavespeed.serverless.modules.logger import (
-    LogLevel,
-    WaverlessLogger,
-    log,
-)
+from wavespeed.serverless.modules.logger import log, LogLevel, WaverlessLogger
 
 
 class TestLogLevel(unittest.TestCase):
@@ -120,7 +115,9 @@ class TestWaverlessLogger(unittest.TestCase):
             "wavespeed.serverless.modules.logger.get_serverless_env"
         ) as mock_env:
             # Return "INFO" for LOG_LEVEL, None for ENDPOINT_ID
-            mock_env.side_effect = lambda key, default="": "INFO" if key == "LOG_LEVEL" else None
+            mock_env.side_effect = (
+                lambda key, default="": "INFO" if key == "LOG_LEVEL" else None
+            )
 
             WaverlessLogger._instance = None
             logger = WaverlessLogger()
@@ -138,7 +135,9 @@ class TestWaverlessLogger(unittest.TestCase):
         with patch(
             "wavespeed.serverless.modules.logger.get_serverless_env"
         ) as mock_env:
-            mock_env.side_effect = lambda key, default="": "INFO" if key == "LOG_LEVEL" else None
+            mock_env.side_effect = (
+                lambda key, default="": "INFO" if key == "LOG_LEVEL" else None
+            )
 
             WaverlessLogger._instance = None
             logger = WaverlessLogger()
@@ -156,7 +155,9 @@ class TestWaverlessLogger(unittest.TestCase):
         with patch(
             "wavespeed.serverless.modules.logger.get_serverless_env"
         ) as mock_env:
-            mock_env.side_effect = lambda key, default="": "INFO" if key == "LOG_LEVEL" else None
+            mock_env.side_effect = (
+                lambda key, default="": "INFO" if key == "LOG_LEVEL" else None
+            )
 
             WaverlessLogger._instance = None
             logger = WaverlessLogger()
@@ -198,7 +199,9 @@ class TestWaverlessLogger(unittest.TestCase):
         with patch(
             "wavespeed.serverless.modules.logger.get_serverless_env"
         ) as mock_env:
-            mock_env.side_effect = lambda key, default="": "INFO" if key == "LOG_LEVEL" else None
+            mock_env.side_effect = (
+                lambda key, default="": "INFO" if key == "LOG_LEVEL" else None
+            )
 
             WaverlessLogger._instance = None
             logger = WaverlessLogger()

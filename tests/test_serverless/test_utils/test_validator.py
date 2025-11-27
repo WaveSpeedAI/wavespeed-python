@@ -84,7 +84,9 @@ class TestValidateTypeChecking(unittest.TestCase):
         result = validate(raw_input, schema)
 
         self.assertIn("errors", result)
-        self.assertTrue(any("count" in err and "type" in err for err in result["errors"]))
+        self.assertTrue(
+            any("count" in err and "type" in err for err in result["errors"])
+        )
 
     def test_int_to_float_conversion(self):
         """Test that int is converted to float when float is expected."""

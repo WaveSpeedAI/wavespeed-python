@@ -2,7 +2,7 @@
 
 import asyncio
 import inspect
-from typing import Any, Callable, Union
+from typing import Any, Callable
 
 
 def is_generator(handler: Callable[..., Any]) -> bool:

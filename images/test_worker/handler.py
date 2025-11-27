@@ -1,5 +1,4 @@
-"""
-WaveSpeed | Test Worker | handler.py
+"""WaveSpeed | Test Worker | handler.py.
 
 Simple test handler for validating the wavespeed serverless SDK.
 """
@@ -28,8 +27,7 @@ INPUT_SCHEMA = {
 
 
 def handler(job):
-    """
-    Simple test handler that processes a message.
+    """Process a message with optional transformations.
 
     Input:
         - message: str - The message to process
@@ -76,8 +74,7 @@ def handler(job):
 
 
 def generator_handler(job):
-    """
-    Test generator handler that yields progress updates.
+    """Yield progress updates for a streaming job.
 
     Input:
         - message: str - The message to process

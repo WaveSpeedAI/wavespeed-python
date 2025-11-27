@@ -2,14 +2,11 @@
 
 import unittest
 from unittest import IsolatedAsyncioTestCase
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
 
-from wavespeed.serverless.modules.progress import (
-    progress_update,
-    async_progress_update,
-)
+from wavespeed.serverless.modules.progress import async_progress_update, progress_update
 from wavespeed.serverless.modules.state import Job
 
 

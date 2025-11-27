@@ -3,7 +3,6 @@
 import io
 import os
 import shutil
-import time
 from typing import Any, Dict, Optional, Tuple
 from urllib.parse import urlparse
 
@@ -136,8 +135,6 @@ def upload_file_to_bucket(
     key = f"{prefix}/{file_name}" if prefix else file_name
 
     log.debug(f"Uploading {file_location} to s3://{bucket_name}/{key}")
-
-    file_size = os.path.getsize(file_location)
 
     upload_file_args = {
         "Filename": file_location,

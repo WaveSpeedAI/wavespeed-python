@@ -1,7 +1,6 @@
 """HTTP communication module for the serverless worker."""
 
-import json
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 import aiohttp
 

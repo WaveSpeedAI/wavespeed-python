@@ -5,13 +5,12 @@ import os
 import tempfile
 import unittest
 from argparse import Namespace
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from wavespeed.serverless.modules.local import (
     _load_test_input,
-    run_local,
     _print_result,
+    run_local,
 )
 
 
@@ -183,7 +182,6 @@ class TestRunLocal(unittest.TestCase):
 
     def test_run_local_wraps_input(self):
         """Test that run_local wraps input in 'input' key if needed."""
-
         captured_input = {}
 
         def handler(job):

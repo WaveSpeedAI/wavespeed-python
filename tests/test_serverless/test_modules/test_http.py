@@ -1,17 +1,12 @@
 """Tests for the http module."""
 
-import json
 import unittest
 from unittest import IsolatedAsyncioTestCase
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, patch
 
 import aiohttp
 
-from wavespeed.serverless.modules.http import (
-    send_result,
-    stream_result,
-    fetch_jobs,
-)
+from wavespeed.serverless.modules.http import fetch_jobs, send_result, stream_result
 from wavespeed.serverless.modules.state import Job
 
 
@@ -129,9 +124,7 @@ class TestSendResult(IsolatedAsyncioTestCase):
                 "API_KEY": "test_key",
             }.get(key, default)
 
-            success = await send_result(
-                self.mock_session, {"output": "test"}, self.job
-            )
+            success = await send_result(self.mock_session, {"output": "test"}, self.job)
 
             self.assertFalse(success)
 
@@ -161,9 +154,7 @@ class TestStreamResult(IsolatedAsyncioTestCase):
                 "API_KEY": "test_key",
             }.get(key, default)
 
-            success = await stream_result(
-                self.mock_session, "partial_output", self.job
-            )
+            success = await stream_result(self.mock_session, "partial_output", self.job)
 
             self.assertTrue(success)
 
@@ -174,9 +165,7 @@ class TestStreamResult(IsolatedAsyncioTestCase):
         ) as mock_env, patch("wavespeed.serverless.modules.http.log"):
             mock_env.return_value = None
 
-            success = await stream_result(
-                self.mock_session, "partial_output", self.job
-            )
+            success = await stream_result(self.mock_session, "partial_output", self.job)
 
             self.assertFalse(success)
 

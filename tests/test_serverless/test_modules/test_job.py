@@ -2,15 +2,13 @@
 
 import unittest
 from unittest import IsolatedAsyncioTestCase
-from unittest.mock import Mock, AsyncMock, patch, MagicMock
-
-import aiohttp
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from wavespeed.serverless.modules.job import (
     get_job,
+    handle_job,
     run_job,
     run_job_generator,
-    handle_job,
 )
 from wavespeed.serverless.modules.state import Job
 

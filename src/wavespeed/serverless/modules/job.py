@@ -3,14 +3,14 @@
 import asyncio
 import inspect
 import traceback
-from typing import Any, AsyncGenerator, Callable, Dict, Generator, Optional, Union
+from typing import Any, Callable, Dict, Generator
 
 import aiohttp
 
 from .handler import is_async_generator, is_sync_generator
 from .http import fetch_jobs, send_result, stream_result
 from .logger import log
-from .state import Job, get_jobs_progress
+from .state import get_jobs_progress, Job
 
 
 async def get_job(
@@ -166,9 +166,7 @@ async def handle_job(
 
     try:
         if is_generator:
-            result = await run_job_generator(
-                handler, job, session, return_aggregate
-            )
+            result = await run_job_generator(handler, job, session, return_aggregate)
         else:
             result = await run_job(handler, job)
 

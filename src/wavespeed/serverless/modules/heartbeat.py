@@ -1,7 +1,6 @@
 """Heartbeat module for keeping the worker alive."""
 
 import multiprocessing
-import os
 import time
 from typing import Optional
 
@@ -73,7 +72,7 @@ class Heartbeat:
         worker_id: str,
         api_key: str,
     ) -> None:
-        """The heartbeat loop running in a separate process.
+        """Run the heartbeat loop in a separate process.
 
         Args:
             endpoint: The ping endpoint URL.

@@ -1,9 +1,8 @@
 """Tests for the scaler module."""
 
-import asyncio
 import unittest
 from unittest import IsolatedAsyncioTestCase
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import AsyncMock, patch
 
 from wavespeed.serverless.modules.scaler import JobScaler
 from wavespeed.serverless.modules.state import Job

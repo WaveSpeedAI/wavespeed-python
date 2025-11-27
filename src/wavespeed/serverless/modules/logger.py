@@ -1,11 +1,10 @@
 """Logging module for the serverless worker."""
 
 import json
-import os
 import sys
 from datetime import datetime
 from enum import IntEnum
-from typing import Any, Optional
+from typing import Optional
 
 from wavespeed.config import get_serverless_env
 
@@ -93,7 +92,9 @@ class WaverlessLogger:
             return message[: self._max_message_length - 3] + "..."
         return message
 
-    def _format_message(self, level: LogLevel, message: str, job_id: Optional[str] = None) -> str:
+    def _format_message(
+        self, level: LogLevel, message: str, job_id: Optional[str] = None
+    ) -> str:
         """Format a log message.
 
         Args:
@@ -122,7 +123,7 @@ class WaverlessLogger:
             return f"{timestamp} | {level.name:5}{job_str} | {message}"
 
     def _log(self, level: LogLevel, message: str, job_id: Optional[str] = None) -> None:
-        """Internal log method.
+        """Log a message at the specified level.
 
         Args:
             level: The log level.
@@ -182,7 +183,12 @@ class WaverlessLogger:
         """
         self._log(LogLevel.ERROR, message, job_id)
 
-    def log(self, message: str, level: LogLevel = LogLevel.INFO, job_id: Optional[str] = None) -> None:
+    def log(
+        self,
+        message: str,
+        level: LogLevel = LogLevel.INFO,
+        job_id: Optional[str] = None,
+    ) -> None:
         """Log a message at the specified level.
 
         Args:

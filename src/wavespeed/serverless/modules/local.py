@@ -1,14 +1,13 @@
 """Local testing module for the serverless worker."""
 
 import json
-import os
 import sys
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 from .handler import is_async, is_async_generator, is_sync_generator
 from .logger import log
-from .state import Job, is_local_test
+from .state import Job
 
 
 def _load_test_input(config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
