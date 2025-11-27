@@ -1,0 +1,8 @@
+{
+  "input": {
+    "message": "Hello, WaveSpeed!",
+    "delay": 0.5,
+    "uppercase": true,
+    "repeat": 3
+  }
+}
