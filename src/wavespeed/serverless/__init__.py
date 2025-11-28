@@ -17,7 +17,7 @@ import signal
 import sys
 from typing import Any, Dict
 
-from wavespeed.config import detect_serverless_env, load_runpod_serverless_config
+from wavespeed.config import _detect_serverless_env
 
 from .modules.handler import is_generator
 from .modules.local import run_local
@@ -120,11 +120,11 @@ def start(config: Dict[str, Any]) -> None:
     if args.waverless_log_level:
         log.set_level(args.waverless_log_level)
 
-    # Detect and load serverless environment config
-    serverless_env = detect_serverless_env()
+    # Config is auto-loaded at import time in wavespeed.config
+    # Just detect environment for logging and storing in config
+    serverless_env = _detect_serverless_env()
     if serverless_env == "runpod":
-        log.debug("Detected RunPod environment, loading config...")
-        load_runpod_serverless_config()
+        log.debug("Detected RunPod environment")
     elif serverless_env == "waverless":
         log.debug("Detected native Waverless environment")
 

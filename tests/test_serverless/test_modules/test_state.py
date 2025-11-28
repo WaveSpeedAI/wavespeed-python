@@ -1,8 +1,6 @@
 """Tests for the state module."""
 
-import os
 import unittest
-from pathlib import Path
 
 from wavespeed.serverless.modules.state import (
     get_jobs_progress,
@@ -16,39 +14,21 @@ from wavespeed.serverless.modules.state import (
 class TestWorkerID(unittest.TestCase):
     """Tests for worker ID functions."""
 
-    def setUp(self):
-        """Reset worker ID before each test."""
-        import wavespeed.serverless.modules.state as state
-
-        state._worker_id = None
-
-    def test_get_worker_id_generates_uuid(self):
-        """Test that get_worker_id generates a UUID when not set."""
-        # Clear any existing environment variable
-        os.environ.pop("WAVERLESS_WORKER_ID", None)
-
+    def test_get_worker_id_returns_value(self):
+        """Test that get_worker_id returns a value."""
         worker_id = get_worker_id()
         self.assertIsNotNone(worker_id)
         self.assertIsInstance(worker_id, str)
         self.assertTrue(len(worker_id) > 0)
 
-    def test_get_worker_id_from_env(self):
-        """Test that get_worker_id reads from environment."""
-        import wavespeed.serverless.modules.state as state
-
-        state._worker_id = None
-        os.environ["WAVERLESS_WORKER_ID"] = "test-worker-123"
-
-        worker_id = get_worker_id()
-        self.assertEqual(worker_id, "test-worker-123")
-
-        # Cleanup
-        os.environ.pop("WAVERLESS_WORKER_ID", None)
-
     def test_set_worker_id(self):
         """Test that set_worker_id sets the worker ID."""
-        set_worker_id("custom-worker-id")
-        self.assertEqual(get_worker_id(), "custom-worker-id")
+        original = get_worker_id()
+        try:
+            set_worker_id("custom-worker-id")
+            self.assertEqual(get_worker_id(), "custom-worker-id")
+        finally:
+            set_worker_id(original)
 
 
 class TestJob(unittest.TestCase):
@@ -106,6 +86,11 @@ class TestJob(unittest.TestCase):
         self.assertNotEqual(job, {"id": "job_123"})
         self.assertNotEqual(job, None)
 
+    def test_str_representation(self):
+        """Test string representation of Job."""
+        job = Job(id="job_123", input={})
+        self.assertEqual(str(job), "job_123")
+
 
 class TestJobsProgress(unittest.TestCase):
     """Tests for the JobsProgress class."""
@@ -114,11 +99,6 @@ class TestJobsProgress(unittest.TestCase):
         """Clear jobs progress before each test."""
         # Reset singleton instance
         JobsProgress._instance = None
-        # Remove pickle file if exists
-        pickle_path = Path("/tmp/waverless_jobs_progress.pkl")
-        if pickle_path.exists():
-            pickle_path.unlink()
-
         self.jobs = JobsProgress()
 
     def tearDown(self):
@@ -131,26 +111,40 @@ class TestJobsProgress(unittest.TestCase):
         jobs2 = JobsProgress()
         self.assertIs(self.jobs, jobs2)
 
-    def test_add_job(self):
-        """Test adding jobs to progress tracker."""
+    def test_add_job_string(self):
+        """Test adding jobs by string ID."""
         self.assertEqual(len(self.jobs), 0)
 
         self.jobs.add("job_123")
         self.assertEqual(len(self.jobs), 1)
-        self.assertIn("job_123", self.jobs)
 
         self.jobs.add("job_456")
         self.assertEqual(len(self.jobs), 2)
-        self.assertIn("job_456", self.jobs)
 
-    def test_remove_job(self):
-        """Test removing jobs from progress tracker."""
+    def test_add_job_dict(self):
+        """Test adding jobs by dict."""
+        self.jobs.add({"id": "job_123", "input": {}})
+        self.assertEqual(len(self.jobs), 1)
+
+    def test_add_job_object(self):
+        """Test adding Job objects."""
+        job = Job(id="job_123", input={})
+        self.jobs.add(job)
+        self.assertEqual(len(self.jobs), 1)
+
+    def test_remove_job_string(self):
+        """Test removing jobs by string ID."""
         self.jobs.add("job_123")
         self.assertEqual(len(self.jobs), 1)
 
         self.jobs.remove("job_123")
         self.assertEqual(len(self.jobs), 0)
-        self.assertNotIn("job_123", self.jobs)
+
+    def test_remove_job_dict(self):
+        """Test removing jobs by dict."""
+        self.jobs.add("job_123")
+        self.jobs.remove({"id": "job_123"})
+        self.assertEqual(len(self.jobs), 0)
 
     def test_remove_nonexistent_job(self):
         """Test removing a job that doesn't exist doesn't raise."""
@@ -163,16 +157,36 @@ class TestJobsProgress(unittest.TestCase):
         self.assertFalse(self.jobs.contains("job_456"))
 
     def test_get_all(self):
-        """Test get_all method."""
+        """Test get_all method returns job IDs."""
         self.jobs.add("job_123")
         self.jobs.add("job_456")
 
         all_jobs = self.jobs.get_all()
         self.assertEqual(all_jobs, {"job_123", "job_456"})
 
-        # Verify it's a copy
-        all_jobs.add("job_789")
-        self.assertNotIn("job_789", self.jobs)
+    def test_get_job_list(self):
+        """Test get_job_list returns comma-separated string."""
+        self.assertIsNone(self.jobs.get_job_list())
+
+        self.jobs.add("job_123")
+        self.assertEqual(self.jobs.get_job_list(), "job_123")
+
+        self.jobs.add("job_456")
+        job_list = self.jobs.get_job_list()
+        # Order may vary, check both are present
+        self.assertIn("job_123", job_list)
+        self.assertIn("job_456", job_list)
+        self.assertIn(",", job_list)
+
+    def test_get_job_count(self):
+        """Test get_job_count method."""
+        self.assertEqual(self.jobs.get_job_count(), 0)
+
+        self.jobs.add("job_123")
+        self.assertEqual(self.jobs.get_job_count(), 1)
+
+        self.jobs.add("job_456")
+        self.assertEqual(self.jobs.get_job_count(), 2)
 
     def test_clear(self):
         """Test clearing all jobs."""
@@ -190,9 +204,6 @@ class TestGetJobsProgress(unittest.TestCase):
     def setUp(self):
         """Reset singleton before each test."""
         JobsProgress._instance = None
-        pickle_path = Path("/tmp/waverless_jobs_progress.pkl")
-        if pickle_path.exists():
-            pickle_path.unlink()
 
     def tearDown(self):
         """Clean up after tests."""

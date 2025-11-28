@@ -16,7 +16,7 @@ from .handler import is_async_generator, is_generator, is_sync_generator
 from .heartbeat import Heartbeat
 from .job import run_job
 from .logger import log
-from .state import Job, JobsProgress
+from .state import JobsProgress
 
 TITLE = "WaveSpeed | Development Worker API"
 
@@ -291,8 +291,8 @@ class WorkerAPI:
     async def _runsync(self, job_request: JobRequest) -> Dict[str, Any]:
         """Submit a job and wait for completion."""
         job_id = f"test-{uuid.uuid4()}"
-        job = Job(id=job_id, input=job_request.input)
-        job_input = {"id": job.id, "input": job.input}
+        job = {"id": job_id, "input": job_request.input}
+        job_input = {"id": job_id, "input": job_request.input}
 
         handler = self.config["handler"]
 
@@ -401,8 +401,8 @@ class WorkerAPI:
             )
 
         pending = _pending_jobs[job_id]
-        job = Job(id=job_id, input=pending["input"])
-        job_input = {"id": job.id, "input": job.input}
+        job = {"id": job_id, "input": pending["input"]}
+        job_input = {"id": job_id, "input": pending["input"]}
         handler = self.config["handler"]
 
         if is_generator(handler):

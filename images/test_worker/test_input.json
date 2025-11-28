@@ -1,6 +1,6 @@
 {
   "input": {
-    "message": "Hello, WaveSpeed!",
+    "prompt": "Hello, WaveSpeedAI!",
     "delay": 0.5,
     "uppercase": true,
     "repeat": 3

@@ -10,7 +10,6 @@ from wavespeed.serverless.modules.job import (
     run_job,
     run_job_generator,
 )
-from wavespeed.serverless.modules.state import Job
 
 
 class TestGetJob(IsolatedAsyncioTestCase):
@@ -31,8 +30,8 @@ class TestGetJob(IsolatedAsyncioTestCase):
             jobs = await get_job(mock_session, num_jobs=1)
 
             self.assertEqual(len(jobs), 1)
-            self.assertEqual(jobs[0].id, "job_123")
-            self.assertEqual(jobs[0].input, {"prompt": "test"})
+            self.assertEqual(jobs[0]["id"], "job_123")
+            self.assertEqual(jobs[0]["input"], {"prompt": "test"})
             mock_fetch.assert_called_once_with(mock_session, 1)
 
     async def test_get_job_empty(self):
@@ -43,11 +42,11 @@ class TestGetJob(IsolatedAsyncioTestCase):
             "wavespeed.serverless.modules.job.fetch_jobs",
             new_callable=AsyncMock,
         ) as mock_fetch:
-            mock_fetch.return_value = []
+            mock_fetch.return_value = None
 
             jobs = await get_job(mock_session, num_jobs=1)
 
-            self.assertEqual(len(jobs), 0)
+            self.assertIsNone(jobs)
 
     async def test_get_job_multiple(self):
         """Test fetching multiple jobs."""
@@ -66,9 +65,9 @@ class TestGetJob(IsolatedAsyncioTestCase):
             jobs = await get_job(mock_session, num_jobs=3)
 
             self.assertEqual(len(jobs), 3)
-            self.assertEqual(jobs[0].id, "job_1")
-            self.assertEqual(jobs[1].id, "job_2")
-            self.assertEqual(jobs[2].id, "job_3")
+            self.assertEqual(jobs[0]["id"], "job_1")
+            self.assertEqual(jobs[1]["id"], "job_2")
+            self.assertEqual(jobs[2]["id"], "job_3")
 
 
 class TestRunJob(IsolatedAsyncioTestCase):
@@ -76,10 +75,10 @@ class TestRunJob(IsolatedAsyncioTestCase):
 
     async def asyncSetUp(self):
         """Set up test fixtures."""
-        self.sample_job = Job(
-            id="test_job_123",
-            input={"prompt": "hello"},
-        )
+        self.sample_job = {
+            "id": "test_job_123",
+            "input": {"prompt": "hello"},
+        }
 
     async def test_sync_handler_success(self):
         """Test running a sync handler successfully."""
@@ -87,7 +86,8 @@ class TestRunJob(IsolatedAsyncioTestCase):
         def sync_handler(job):
             return {"result": job["input"]["prompt"].upper()}
 
-        result = await run_job(sync_handler, self.sample_job)
+        with patch("wavespeed.serverless.modules.job.serverless"):
+            result = await run_job(sync_handler, self.sample_job)
 
         self.assertEqual(result, {"output": {"result": "HELLO"}})
 
@@ -97,7 +97,8 @@ class TestRunJob(IsolatedAsyncioTestCase):
         async def async_handler(job):
             return {"result": job["input"]["prompt"].upper()}
 
-        result = await run_job(async_handler, self.sample_job)
+        with patch("wavespeed.serverless.modules.job.serverless"):
+            result = await run_job(async_handler, self.sample_job)
 
         self.assertEqual(result, {"output": {"result": "HELLO"}})
 
@@ -107,7 +108,8 @@ class TestRunJob(IsolatedAsyncioTestCase):
         def handler(job):
             return {"output": "already wrapped"}
 
-        result = await run_job(handler, self.sample_job)
+        with patch("wavespeed.serverless.modules.job.serverless"):
+            result = await run_job(handler, self.sample_job)
 
         self.assertEqual(result, {"output": {"output": "already wrapped"}})
 
@@ -117,9 +119,11 @@ class TestRunJob(IsolatedAsyncioTestCase):
         def handler(job):
             return {"error": "something went wrong"}
 
-        result = await run_job(handler, self.sample_job)
+        with patch("wavespeed.serverless.modules.job.serverless"):
+            result = await run_job(handler, self.sample_job)
 
-        self.assertEqual(result, {"output": {}, "error": "something went wrong"})
+        self.assertIn("error", result)
+        self.assertEqual(result["error"], "something went wrong")
 
     async def test_handler_returns_none(self):
         """Test handler that returns None."""
@@ -127,7 +131,8 @@ class TestRunJob(IsolatedAsyncioTestCase):
         def handler(job):
             return None
 
-        result = await run_job(handler, self.sample_job)
+        with patch("wavespeed.serverless.modules.job.serverless"):
+            result = await run_job(handler, self.sample_job)
 
         self.assertEqual(result, {"output": None})
 
@@ -137,7 +142,8 @@ class TestRunJob(IsolatedAsyncioTestCase):
         def handler(job):
             return 42
 
-        result = await run_job(handler, self.sample_job)
+        with patch("wavespeed.serverless.modules.job.serverless"):
+            result = await run_job(handler, self.sample_job)
 
         self.assertEqual(result, {"output": 42})
 
@@ -147,7 +153,8 @@ class TestRunJob(IsolatedAsyncioTestCase):
         def handler(job):
             return True
 
-        result = await run_job(handler, self.sample_job)
+        with patch("wavespeed.serverless.modules.job.serverless"):
+            result = await run_job(handler, self.sample_job)
 
         self.assertEqual(result, {"output": True})
 
@@ -157,7 +164,10 @@ class TestRunJob(IsolatedAsyncioTestCase):
         def handler(job):
             raise ValueError("Test error")
 
-        with patch("wavespeed.serverless.modules.job.log"):
+        with patch("wavespeed.serverless.modules.job.log"), patch(
+            "wavespeed.serverless.modules.job.serverless"
+        ) as mock_serverless:
+            mock_serverless.pod_hostname = ""
             result = await run_job(handler, self.sample_job)
 
         self.assertIn("error", result)
@@ -169,10 +179,10 @@ class TestRunJobGenerator(IsolatedAsyncioTestCase):
 
     async def asyncSetUp(self):
         """Set up test fixtures."""
-        self.sample_job = Job(
-            id="gen_job_123",
-            input={"count": 3},
-        )
+        self.sample_job = {
+            "id": "gen_job_123",
+            "input": {"count": 3},
+        }
         self.mock_session = AsyncMock()
 
     async def test_sync_generator_success(self):
@@ -189,12 +199,12 @@ class TestRunJobGenerator(IsolatedAsyncioTestCase):
         with patch(
             "wavespeed.serverless.modules.job.stream_result",
             new_callable=AsyncMock,
-        ) as mock_stream:
+        ) as mock_stream, patch("wavespeed.serverless.modules.job.serverless"):
             result = await run_job_generator(
                 gen_handler, self.sample_job, self.mock_session
             )
 
-            self.assertEqual(result, {"output": None})
+            self.assertIn("_is_stream", result)
             self.assertEqual(mock_stream.call_count, 3)
 
     async def test_async_generator_success(self):
@@ -207,12 +217,12 @@ class TestRunJobGenerator(IsolatedAsyncioTestCase):
         with patch(
             "wavespeed.serverless.modules.job.stream_result",
             new_callable=AsyncMock,
-        ) as mock_stream:
+        ) as mock_stream, patch("wavespeed.serverless.modules.job.serverless"):
             result = await run_job_generator(
                 async_gen_handler, self.sample_job, self.mock_session
             )
 
-            self.assertEqual(result, {"output": None})
+            self.assertIn("_is_stream", result)
             self.assertEqual(mock_stream.call_count, 3)
 
     async def test_generator_with_aggregate(self):
@@ -225,7 +235,7 @@ class TestRunJobGenerator(IsolatedAsyncioTestCase):
         with patch(
             "wavespeed.serverless.modules.job.stream_result",
             new_callable=AsyncMock,
-        ):
+        ), patch("wavespeed.serverless.modules.job.serverless"):
             result = await run_job_generator(
                 gen_handler,
                 self.sample_job,
@@ -233,7 +243,7 @@ class TestRunJobGenerator(IsolatedAsyncioTestCase):
                 return_aggregate=True,
             )
 
-            self.assertEqual(result, {"output": ["part1", "part2"]})
+            self.assertEqual(result["output"], ["part1", "part2"])
 
     async def test_generator_exception(self):
         """Test generator that raises an exception."""
@@ -245,7 +255,10 @@ class TestRunJobGenerator(IsolatedAsyncioTestCase):
         with patch(
             "wavespeed.serverless.modules.job.stream_result",
             new_callable=AsyncMock,
-        ), patch("wavespeed.serverless.modules.job.log"):
+        ), patch("wavespeed.serverless.modules.job.log"), patch(
+            "wavespeed.serverless.modules.job.serverless"
+        ) as mock_serverless:
+            mock_serverless.pod_hostname = ""
             result = await run_job_generator(
                 gen_handler, self.sample_job, self.mock_session
             )
@@ -259,10 +272,10 @@ class TestHandleJob(IsolatedAsyncioTestCase):
 
     async def asyncSetUp(self):
         """Set up test fixtures."""
-        self.sample_job = Job(
-            id="handle_job_123",
-            input={"data": "test"},
-        )
+        self.sample_job = {
+            "id": "handle_job_123",
+            "input": {"data": "test"},
+        }
         self.mock_session = AsyncMock()
 
     async def test_handle_job_success(self):
@@ -280,14 +293,16 @@ class TestHandleJob(IsolatedAsyncioTestCase):
             "wavespeed.serverless.modules.job.get_jobs_progress"
         ) as mock_progress, patch(
             "wavespeed.serverless.modules.job.log"
+        ), patch(
+            "wavespeed.serverless.modules.job.serverless"
         ):
             mock_jobs = MagicMock()
             mock_progress.return_value = mock_jobs
 
             await handle_job(self.mock_session, config, self.sample_job)
 
-            mock_jobs.add.assert_called_once_with("handle_job_123")
-            mock_jobs.remove.assert_called_once_with("handle_job_123")
+            mock_jobs.add.assert_called_once_with(self.sample_job)
+            mock_jobs.remove.assert_called_once_with(self.sample_job)
             mock_send.assert_called_once()
 
     async def test_handle_job_generator(self):
@@ -309,6 +324,8 @@ class TestHandleJob(IsolatedAsyncioTestCase):
             "wavespeed.serverless.modules.job.get_jobs_progress"
         ) as mock_progress, patch(
             "wavespeed.serverless.modules.job.log"
+        ), patch(
+            "wavespeed.serverless.modules.job.serverless"
         ):
             mock_jobs = MagicMock()
             mock_progress.return_value = mock_jobs
@@ -333,13 +350,15 @@ class TestHandleJob(IsolatedAsyncioTestCase):
             "wavespeed.serverless.modules.job.get_jobs_progress"
         ) as mock_progress, patch(
             "wavespeed.serverless.modules.job.log"
+        ), patch(
+            "wavespeed.serverless.modules.job.serverless"
         ):
             mock_jobs = MagicMock()
             mock_progress.return_value = mock_jobs
 
             await handle_job(self.mock_session, config, self.sample_job)
 
-            self.assertTrue(config.get("_shutdown"))
+            self.assertTrue(config.get("refresh_worker"))
 
     async def test_handle_job_exception(self):
         """Test job handling when an exception occurs."""
@@ -356,14 +375,17 @@ class TestHandleJob(IsolatedAsyncioTestCase):
             "wavespeed.serverless.modules.job.get_jobs_progress"
         ) as mock_progress, patch(
             "wavespeed.serverless.modules.job.log"
-        ):
+        ), patch(
+            "wavespeed.serverless.modules.job.serverless"
+        ) as mock_serverless:
+            mock_serverless.pod_hostname = ""
             mock_jobs = MagicMock()
             mock_progress.return_value = mock_jobs
 
             await handle_job(self.mock_session, config, self.sample_job)
 
             # Job should still be removed from progress
-            mock_jobs.remove.assert_called_once_with("handle_job_123")
+            mock_jobs.remove.assert_called_once_with(self.sample_job)
             # Error result should be sent
             mock_send.assert_called()
 

@@ -2,7 +2,7 @@
 
 from typing import Any, Dict
 
-from wavespeed.config import get_serverless_env
+from wavespeed.config import serverless
 
 from .modules.heartbeat import Heartbeat
 from .modules.local import run_local
@@ -29,8 +29,7 @@ def _is_local(config: Dict[str, Any]) -> bool:
         return True
 
     # Check if job endpoint is configured
-    job_endpoint = get_serverless_env("JOB_ENDPOINT")
-    if not job_endpoint:
+    if not serverless.webhook_get_job:
         return True
 
     return False
@@ -53,8 +52,8 @@ def run_worker(config: Dict[str, Any]) -> None:
         run_local(config)
         return
 
-    log.info(f"Worker ID: {get_serverless_env('WORKER_ID', 'unknown')}")
-    log.info(f"Job endpoint: {get_serverless_env('JOB_ENDPOINT', 'not set')}")
+    log.info(f"Worker ID: {serverless.pod_id or 'unknown'}")
+    log.info(f"Job endpoint: {serverless.webhook_get_job or 'not set'}")
 
     # Start heartbeat process
     heartbeat = Heartbeat()

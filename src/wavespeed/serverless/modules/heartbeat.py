@@ -6,10 +6,10 @@ from typing import Optional
 
 import requests
 
-from wavespeed.config import get_serverless_env
+from wavespeed import __version__ as wavespeed_version
+from wavespeed.config import serverless
 
 from .logger import log
-from .state import get_worker_id
 
 
 class Heartbeat:
@@ -25,14 +25,20 @@ class Heartbeat:
 
     def __init__(self) -> None:
         """Initialize the heartbeat."""
-        self.interval = int(get_serverless_env("PING_INTERVAL", "10000"))
+        self.interval = serverless.ping_interval
         self._process: Optional[multiprocessing.Process] = None
         self._stop_event: Optional[multiprocessing.Event] = None
 
     def start(self) -> None:
         """Start the heartbeat process."""
-        ping_endpoint = get_serverless_env("PING_ENDPOINT")
-        if not ping_endpoint:
+        # Check prerequisites (matching runpod-python behavior)
+        api_key = serverless.api_key
+        if not api_key:
+            log.debug("No API key configured, heartbeat disabled")
+            return
+
+        ping_url = serverless.ping_url
+        if not ping_url:
             log.debug("No ping endpoint configured, heartbeat disabled")
             return
 
@@ -40,11 +46,11 @@ class Heartbeat:
         self._process = multiprocessing.Process(
             target=self._heartbeat_loop,
             args=(
-                ping_endpoint,
+                ping_url,
                 self.interval,
                 self._stop_event,
-                get_worker_id(),
-                get_serverless_env("API_KEY", ""),
+                api_key,
+                wavespeed_version,
             ),
             daemon=True,
         )
@@ -69,8 +75,8 @@ class Heartbeat:
         endpoint: str,
         interval_ms: int,
         stop_event: multiprocessing.Event,
-        worker_id: str,
         api_key: str,
+        version: str,
     ) -> None:
         """Run the heartbeat loop in a separate process.
 
@@ -78,25 +84,48 @@ class Heartbeat:
             endpoint: The ping endpoint URL.
             interval_ms: Interval between pings in milliseconds.
             stop_event: Event to signal shutdown.
-            worker_id: The worker ID to include in pings.
             api_key: API key for authentication.
+            version: The wavespeed package version.
         """
+        # Import here to avoid pickling issues with multiprocessing
+        from .state import JobsProgress
+
         interval_sec = interval_ms / 1000.0
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        }
+        timeout = interval_sec * 2
+
+        # Create session with retry strategy (matching runpod-python)
+        session = requests.Session()
+        session.headers.update({"Authorization": api_key})
+
+        retry_strategy = requests.adapters.Retry(
+            total=3,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=["GET"],
+            backoff_factor=1,
+        )
+        adapter = requests.adapters.HTTPAdapter(
+            pool_connections=10,
+            pool_maxsize=10,
+            max_retries=retry_strategy,
+        )
+        session.mount("http://", adapter)
+        session.mount("https://", adapter)
 
         while not stop_event.is_set():
             try:
-                response = requests.post(
+                # Get current job IDs as comma-separated string (matching runpod-python)
+                jobs = JobsProgress()
+                job_ids = jobs.get_job_list()
+
+                # Use GET with query params (matching runpod-python)
+                ping_params = {"job_id": job_ids, "wavespeed_version": version}
+                response = session.get(
                     endpoint,
-                    json={"worker_id": worker_id},
-                    headers=headers,
-                    timeout=10,
+                    params=ping_params,
+                    timeout=timeout,
                 )
+
                 if response.status_code != 200:
-                    # Log to stderr since we're in a subprocess
                     print(f"Heartbeat failed: {response.status_code}", flush=True)
             except requests.RequestException as e:
                 print(f"Heartbeat error: {e}", flush=True)

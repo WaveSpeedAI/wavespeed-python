@@ -1,11 +1,11 @@
 """Tests for the scaler module."""
 
+import asyncio
 import unittest
 from unittest import IsolatedAsyncioTestCase
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from wavespeed.serverless.modules.scaler import JobScaler
-from wavespeed.serverless.modules.state import Job
 
 
 class TestJobScaler(unittest.TestCase):
@@ -15,13 +15,12 @@ class TestJobScaler(unittest.TestCase):
         """Test JobScaler initialization."""
         config = {"handler": lambda x: x}
 
-        scaler = JobScaler(config)
+        with patch("wavespeed.serverless.modules.scaler.JobsProgress"):
+            scaler = JobScaler(config)
 
-        self.assertEqual(scaler.config, config)
-        self.assertEqual(scaler.current_concurrency, 1)
-        self.assertEqual(scaler.max_concurrency, 1)
-        self.assertFalse(scaler._shutdown)
-        self.assertEqual(scaler._active_jobs, 0)
+            self.assertEqual(scaler.config, config)
+            self.assertEqual(scaler.current_concurrency, 1)
+            self.assertEqual(scaler.jobs_fetcher_timeout, 90)
 
     def test_initialization_with_concurrency_modifier(self):
         """Test JobScaler with concurrency modifier."""
@@ -31,184 +30,209 @@ class TestJobScaler(unittest.TestCase):
 
         config = {"handler": lambda x: x, "concurrency_modifier": modifier}
 
-        scaler = JobScaler(config)
+        with patch("wavespeed.serverless.modules.scaler.JobsProgress"):
+            scaler = JobScaler(config)
 
-        self.assertIsNotNone(scaler._concurrency_modifier)
+            self.assertIsNotNone(scaler.concurrency_modifier)
 
-    def test_set_scale(self):
-        """Test set_scale method."""
+    def test_is_alive(self):
+        """Test is_alive method."""
         config = {"handler": lambda x: x}
-        scaler = JobScaler(config)
 
-        with patch("wavespeed.serverless.modules.scaler.log"):
-            scaler.set_scale(5)
+        with patch("wavespeed.serverless.modules.scaler.JobsProgress"):
+            scaler = JobScaler(config)
 
-        self.assertEqual(scaler.current_concurrency, 5)
-        self.assertEqual(scaler.max_concurrency, 5)
-
-    def test_set_scale_minimum(self):
-        """Test set_scale enforces minimum of 1."""
-        config = {"handler": lambda x: x}
-        scaler = JobScaler(config)
-
-        with patch("wavespeed.serverless.modules.scaler.log"):
-            scaler.set_scale(0)
-
-        self.assertEqual(scaler.current_concurrency, 1)
+            self.assertTrue(scaler.is_alive())
 
     def test_kill_worker(self):
         """Test kill_worker method."""
         config = {"handler": lambda x: x}
-        scaler = JobScaler(config)
 
-        with patch("wavespeed.serverless.modules.scaler.log"):
+        with patch("wavespeed.serverless.modules.scaler.JobsProgress"), patch(
+            "wavespeed.serverless.modules.scaler.log"
+        ):
+            scaler = JobScaler(config)
             scaler.kill_worker()
 
-        self.assertTrue(scaler._shutdown)
-        self.assertTrue(config.get("_shutdown"))
+            self.assertFalse(scaler.is_alive())
 
 
 class TestJobScalerAsync(IsolatedAsyncioTestCase):
     """Async tests for the JobScaler class."""
 
-    async def test_update_concurrency(self):
-        """Test _update_concurrency with modifier."""
-        call_count = {"count": 0}
-
-        def modifier(current):
-            call_count["count"] += 1
-            return current + 1
-
-        config = {"handler": lambda x: x, "concurrency_modifier": modifier}
-        scaler = JobScaler(config)
-
-        with patch("wavespeed.serverless.modules.scaler.log"):
-            scaler._update_concurrency()
-
-        self.assertEqual(scaler.current_concurrency, 2)
-        self.assertEqual(call_count["count"], 1)
-
-    async def test_update_concurrency_no_modifier(self):
-        """Test _update_concurrency without modifier."""
+    async def test_set_scale(self):
+        """Test set_scale method."""
         config = {"handler": lambda x: x}
-        scaler = JobScaler(config)
 
-        scaler._update_concurrency()
+        with patch("wavespeed.serverless.modules.scaler.JobsProgress") as mock_progress:
+            mock_progress_instance = MagicMock()
+            mock_progress_instance.get_job_count.return_value = 0
+            mock_progress.return_value = mock_progress_instance
 
-        self.assertEqual(scaler.current_concurrency, 1)
+            scaler = JobScaler(config)
+            scaler.concurrency_modifier = lambda x: 5
 
-    async def test_update_concurrency_modifier_exception(self):
-        """Test _update_concurrency handles modifier exceptions."""
+            with patch("wavespeed.serverless.modules.scaler.log"):
+                await scaler.set_scale()
 
-        def bad_modifier(current):
-            raise ValueError("Modifier failed")
+            self.assertEqual(scaler.current_concurrency, 5)
 
-        config = {"handler": lambda x: x, "concurrency_modifier": bad_modifier}
-        scaler = JobScaler(config)
+    async def test_current_occupancy(self):
+        """Test current_occupancy method."""
+        config = {"handler": lambda x: x}
 
-        with patch("wavespeed.serverless.modules.scaler.log"):
-            scaler._update_concurrency()
+        with patch("wavespeed.serverless.modules.scaler.JobsProgress") as mock_progress:
+            mock_progress_instance = MagicMock()
+            mock_progress_instance.get_job_count.return_value = 2
+            mock_progress.return_value = mock_progress_instance
 
-        # Concurrency should remain unchanged
-        self.assertEqual(scaler.current_concurrency, 1)
+            scaler = JobScaler(config)
+            scaler.job_progress = mock_progress_instance
 
-    async def test_handle_job_wrapper(self):
-        """Test _handle_job_wrapper method."""
+            with patch("wavespeed.serverless.modules.scaler.log"):
+                occupancy = scaler.current_occupancy()
+
+            # Queue is empty (0) + progress count (2) = 2
+            self.assertEqual(occupancy, 2)
+
+    async def test_handle_job(self):
+        """Test handle_job method."""
         config = {"handler": lambda x: {"output": "test"}}
-        scaler = JobScaler(config)
+
         mock_session = AsyncMock()
-        job = Job(id="test_job", input={})
+        job = {"id": "test_job", "input": {}}
 
-        with patch(
-            "wavespeed.serverless.modules.scaler.handle_job", new_callable=AsyncMock
-        ) as mock_handle:
-            await scaler._handle_job_wrapper(mock_session, job)
+        with patch("wavespeed.serverless.modules.scaler.JobsProgress") as mock_progress:
+            mock_progress_instance = MagicMock()
+            mock_progress.return_value = mock_progress_instance
 
-            mock_handle.assert_called_once_with(mock_session, config, job)
+            scaler = JobScaler(config)
+            scaler.job_progress = mock_progress_instance
+            scaler.jobs_queue = AsyncMock()
 
-    async def test_handle_job_wrapper_exception(self):
-        """Test _handle_job_wrapper handles exceptions."""
+            # Override the jobs_handler directly since __init__ already captured handle_job
+            mock_handle = AsyncMock()
+            scaler.jobs_handler = mock_handle
+
+            with patch("wavespeed.serverless.modules.scaler.log"):
+                await scaler.handle_job(mock_session, job)
+
+                mock_handle.assert_called_once_with(mock_session, config, job)
+                mock_progress_instance.remove.assert_called_once_with(job)
+
+    async def test_handle_job_exception(self):
+        """Test handle_job handles exceptions."""
         config = {"handler": lambda x: x}
-        scaler = JobScaler(config)
         mock_session = AsyncMock()
-        job = Job(id="test_job", input={})
+        job = {"id": "test_job", "input": {}}
 
-        with patch(
-            "wavespeed.serverless.modules.scaler.handle_job", new_callable=AsyncMock
-        ) as mock_handle, patch("wavespeed.serverless.modules.scaler.log"):
+        with patch("wavespeed.serverless.modules.scaler.JobsProgress") as mock_progress:
+            mock_progress_instance = MagicMock()
+            mock_progress.return_value = mock_progress_instance
+
+            scaler = JobScaler(config)
+            scaler.job_progress = mock_progress_instance
+            scaler.jobs_queue = AsyncMock()
+
+            # Override the jobs_handler directly since __init__ already captured handle_job
+            mock_handle = AsyncMock()
             mock_handle.side_effect = RuntimeError("Job failed")
+            scaler.jobs_handler = mock_handle
 
-            # Should not raise
-            await scaler._handle_job_wrapper(mock_session, job)
+            with patch("wavespeed.serverless.modules.scaler.log"):
+                with self.assertRaises(RuntimeError):
+                    await scaler.handle_job(mock_session, job)
 
-    async def test_fetch_jobs_loop_shutdown(self):
-        """Test _fetch_jobs_loop stops on shutdown."""
+                # Job should still be removed from progress
+                mock_progress_instance.remove.assert_called_once_with(job)
+
+    async def test_get_jobs_shutdown(self):
+        """Test get_jobs stops on shutdown."""
         config = {"handler": lambda x: x}
-        scaler = JobScaler(config)
-        scaler._shutdown = True
 
-        mock_session = AsyncMock()
+        with patch("wavespeed.serverless.modules.scaler.JobsProgress") as mock_progress:
+            mock_progress_instance = MagicMock()
+            mock_progress.return_value = mock_progress_instance
 
-        # Should return immediately without fetching
-        await scaler._fetch_jobs_loop(mock_session)
+            scaler = JobScaler(config)
+            scaler.kill_worker()
 
-    async def test_run_jobs_loop_shutdown(self):
-        """Test _run_jobs_loop stops on shutdown."""
+            mock_session = AsyncMock()
+
+            with patch("wavespeed.serverless.modules.scaler.log"):
+                # Should return immediately without fetching
+                await scaler.get_jobs(mock_session)
+
+    async def test_run_jobs_shutdown(self):
+        """Test run_jobs stops on shutdown."""
         config = {"handler": lambda x: x}
-        scaler = JobScaler(config)
-        scaler._shutdown = True
 
-        mock_session = AsyncMock()
+        with patch("wavespeed.serverless.modules.scaler.JobsProgress"):
+            scaler = JobScaler(config)
+            scaler.kill_worker()
 
-        # Should return immediately
-        await scaler._run_jobs_loop(mock_session)
+            mock_session = AsyncMock()
+
+            with patch("wavespeed.serverless.modules.scaler.log"):
+                # Should return immediately
+                await scaler.run_jobs(mock_session)
 
     async def test_jobs_queue(self):
         """Test jobs are properly queued."""
         config = {"handler": lambda x: x}
-        scaler = JobScaler(config)
 
-        job = Job(id="queue_test", input={})
-        await scaler.jobs_queue.put(job)
+        with patch("wavespeed.serverless.modules.scaler.JobsProgress"):
+            scaler = JobScaler(config)
 
-        self.assertEqual(scaler.jobs_queue.qsize(), 1)
-        retrieved = await scaler.jobs_queue.get()
-        self.assertEqual(retrieved.id, "queue_test")
+            job = {"id": "queue_test", "input": {}}
+            await scaler.jobs_queue.put(job)
+
+            self.assertEqual(scaler.jobs_queue.qsize(), 1)
+            retrieved = await scaler.jobs_queue.get()
+            self.assertEqual(retrieved["id"], "queue_test")
 
 
 class TestJobScalerIntegration(IsolatedAsyncioTestCase):
     """Integration tests for JobScaler."""
 
-    async def test_fetch_and_queue_jobs(self):
-        """Test fetching jobs and queuing them."""
+    async def test_get_jobs_queues_jobs(self):
+        """Test getting jobs and queuing them."""
         config = {"handler": lambda x: {"output": "test"}}
-        scaler = JobScaler(config)
-        scaler.max_concurrency = 5
 
         mock_session = AsyncMock()
 
-        with patch(
-            "wavespeed.serverless.modules.scaler.get_job", new_callable=AsyncMock
-        ) as mock_get_job, patch("wavespeed.serverless.modules.scaler.log"):
-            # Return jobs once, then trigger shutdown
+        with patch("wavespeed.serverless.modules.scaler.JobsProgress") as mock_progress:
+            mock_progress_instance = MagicMock()
+            mock_progress_instance.get_job_count.return_value = 0
+            mock_progress.return_value = mock_progress_instance
+
+            scaler = JobScaler(config)
+            scaler.job_progress = mock_progress_instance
+
+            # Increase concurrency to allow for 2 calls
+            scaler.current_concurrency = 2
+            scaler.jobs_queue = asyncio.Queue(maxsize=2)
+
+            # Return 1 job first, then 1 more job and shutdown
             call_count = {"count": 0}
 
             async def mock_get_job_impl(session, num_jobs):
                 call_count["count"] += 1
                 if call_count["count"] == 1:
-                    return [
-                        Job(id="job_1", input={}),
-                        Job(id="job_2", input={}),
-                    ]
-                scaler._shutdown = True
-                return []
+                    return [{"id": "job_1", "input": {}}]
+                if call_count["count"] == 2:
+                    scaler.kill_worker()
+                    return [{"id": "job_2", "input": {}}]
+                return None
 
-            mock_get_job.side_effect = mock_get_job_impl
+            # Override the jobs_fetcher directly since __init__ already captured get_job
+            scaler.jobs_fetcher = mock_get_job_impl
 
-            # Run fetch loop (will exit after 2nd call due to shutdown)
-            await scaler._fetch_jobs_loop(mock_session)
+            with patch("wavespeed.serverless.modules.scaler.log"):
+                # Run get_jobs loop (will exit after 2nd call due to shutdown)
+                await scaler.get_jobs(mock_session)
 
-            self.assertEqual(scaler.jobs_queue.qsize(), 2)
+                self.assertEqual(scaler.jobs_queue.qsize(), 2)
 
 
 if __name__ == "__main__":

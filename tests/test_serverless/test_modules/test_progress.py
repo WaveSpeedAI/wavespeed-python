@@ -18,11 +18,11 @@ class TestProgressUpdate(unittest.TestCase):
         job = Job(id="job_123", input={})
 
         with patch(
-            "wavespeed.serverless.modules.progress.get_serverless_env"
-        ) as mock_env, patch(
+            "wavespeed.serverless.modules.progress.serverless"
+        ) as mock_serverless, patch(
             "wavespeed.serverless.modules.progress.threading.Thread"
         ) as mock_thread:
-            mock_env.return_value = "http://test.endpoint/output"
+            mock_serverless.webhook_post_output = "http://test.endpoint/output"
             mock_thread_instance = MagicMock()
             mock_thread.return_value = mock_thread_instance
 
@@ -37,11 +37,11 @@ class TestProgressUpdate(unittest.TestCase):
         job = {"id": "job_123", "input": {}}
 
         with patch(
-            "wavespeed.serverless.modules.progress.get_serverless_env"
-        ) as mock_env, patch(
+            "wavespeed.serverless.modules.progress.serverless"
+        ) as mock_serverless, patch(
             "wavespeed.serverless.modules.progress.threading.Thread"
         ) as mock_thread:
-            mock_env.return_value = "http://test.endpoint/output"
+            mock_serverless.webhook_post_output = "http://test.endpoint/output"
             mock_thread_instance = MagicMock()
             mock_thread.return_value = mock_thread_instance
 
@@ -62,9 +62,9 @@ class TestProgressUpdate(unittest.TestCase):
         job = Job(id="job_123", input={})
 
         with patch(
-            "wavespeed.serverless.modules.progress.get_serverless_env"
-        ) as mock_env, patch("wavespeed.serverless.modules.progress.log"):
-            mock_env.return_value = None
+            "wavespeed.serverless.modules.progress.serverless"
+        ) as mock_serverless, patch("wavespeed.serverless.modules.progress.log"):
+            mock_serverless.webhook_post_output = None
 
             result = progress_update(job, {"progress": 50})
 
@@ -89,12 +89,10 @@ class TestAsyncProgressUpdate(IsolatedAsyncioTestCase):
         self.mock_session.post.return_value = mock_response
 
         with patch(
-            "wavespeed.serverless.modules.progress.get_serverless_env"
-        ) as mock_env, patch("wavespeed.serverless.modules.progress.log"):
-            mock_env.side_effect = lambda key, default="": {
-                "OUTPUT_ENDPOINT": "http://test.endpoint/output",
-                "API_KEY": "test_key",
-            }.get(key, default)
+            "wavespeed.serverless.modules.progress.serverless"
+        ) as mock_serverless, patch("wavespeed.serverless.modules.progress.log"):
+            mock_serverless.webhook_post_output = "http://test.endpoint/output"
+            mock_serverless.api_key = "test_key"
 
             result = await async_progress_update(
                 self.mock_session, self.job, {"progress": 50}
@@ -113,12 +111,10 @@ class TestAsyncProgressUpdate(IsolatedAsyncioTestCase):
         self.mock_session.post.return_value = mock_response
 
         with patch(
-            "wavespeed.serverless.modules.progress.get_serverless_env"
-        ) as mock_env, patch("wavespeed.serverless.modules.progress.log"):
-            mock_env.side_effect = lambda key, default="": {
-                "OUTPUT_ENDPOINT": "http://test.endpoint/output",
-                "API_KEY": "test_key",
-            }.get(key, default)
+            "wavespeed.serverless.modules.progress.serverless"
+        ) as mock_serverless, patch("wavespeed.serverless.modules.progress.log"):
+            mock_serverless.webhook_post_output = "http://test.endpoint/output"
+            mock_serverless.api_key = "test_key"
 
             await async_progress_update(
                 self.mock_session, self.job, {"current": 5, "total": 10}
@@ -133,9 +129,9 @@ class TestAsyncProgressUpdate(IsolatedAsyncioTestCase):
     async def test_async_progress_update_no_endpoint(self):
         """Test async progress update when no endpoint configured."""
         with patch(
-            "wavespeed.serverless.modules.progress.get_serverless_env"
-        ) as mock_env, patch("wavespeed.serverless.modules.progress.log"):
-            mock_env.return_value = None
+            "wavespeed.serverless.modules.progress.serverless"
+        ) as mock_serverless, patch("wavespeed.serverless.modules.progress.log"):
+            mock_serverless.webhook_post_output = None
 
             result = await async_progress_update(
                 self.mock_session, self.job, {"progress": 50}
@@ -153,12 +149,10 @@ class TestAsyncProgressUpdate(IsolatedAsyncioTestCase):
         self.mock_session.post.return_value = mock_response
 
         with patch(
-            "wavespeed.serverless.modules.progress.get_serverless_env"
-        ) as mock_env, patch("wavespeed.serverless.modules.progress.log"):
-            mock_env.side_effect = lambda key, default="": {
-                "OUTPUT_ENDPOINT": "http://test.endpoint/output",
-                "API_KEY": "test_key",
-            }.get(key, default)
+            "wavespeed.serverless.modules.progress.serverless"
+        ) as mock_serverless, patch("wavespeed.serverless.modules.progress.log"):
+            mock_serverless.webhook_post_output = "http://test.endpoint/output"
+            mock_serverless.api_key = "test_key"
 
             result = await async_progress_update(
                 self.mock_session, self.job, {"progress": 50}
@@ -171,12 +165,10 @@ class TestAsyncProgressUpdate(IsolatedAsyncioTestCase):
         self.mock_session.post.side_effect = aiohttp.ClientError("Connection failed")
 
         with patch(
-            "wavespeed.serverless.modules.progress.get_serverless_env"
-        ) as mock_env, patch("wavespeed.serverless.modules.progress.log"):
-            mock_env.side_effect = lambda key, default="": {
-                "OUTPUT_ENDPOINT": "http://test.endpoint/output",
-                "API_KEY": "test_key",
-            }.get(key, default)
+            "wavespeed.serverless.modules.progress.serverless"
+        ) as mock_serverless, patch("wavespeed.serverless.modules.progress.log"):
+            mock_serverless.webhook_post_output = "http://test.endpoint/output"
+            mock_serverless.api_key = "test_key"
 
             result = await async_progress_update(
                 self.mock_session, self.job, {"progress": 50}

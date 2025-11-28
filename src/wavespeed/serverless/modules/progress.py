@@ -6,7 +6,7 @@ from typing import Any, Dict
 import aiohttp
 import requests
 
-from wavespeed.config import get_serverless_env
+from wavespeed.config import serverless
 
 from .logger import log
 from .state import Job
@@ -35,15 +35,14 @@ def progress_update(job: Job | Dict[str, Any], progress: Any) -> bool:
         return False
 
     # Get output endpoint
-    output_endpoint = get_serverless_env("OUTPUT_ENDPOINT")
-    if not output_endpoint:
+    if not serverless.webhook_post_output:
         log.warn("No output endpoint configured for progress update")
         return False
 
     # Start thread to send update
     thread = threading.Thread(
         target=_send_progress_update,
-        args=(output_endpoint, job_id, progress),
+        args=(serverless.webhook_post_output, job_id, progress),
         daemon=True,
     )
     thread.start()
@@ -58,7 +57,7 @@ def _send_progress_update(endpoint: str, job_id: str, progress: Any) -> None:
         job_id: The job ID.
         progress: The progress data.
     """
-    api_key = get_serverless_env("API_KEY", "")
+    api_key = serverless.api_key if serverless.api_key else ""
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
@@ -102,12 +101,11 @@ async def async_progress_update(
     Returns:
         True if the update was sent successfully.
     """
-    output_endpoint = get_serverless_env("OUTPUT_ENDPOINT")
-    if not output_endpoint:
+    if not serverless.webhook_post_output:
         log.warn("No output endpoint configured for progress update")
         return False
 
-    api_key = get_serverless_env("API_KEY", "")
+    api_key = serverless.api_key if serverless.api_key else ""
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
@@ -121,7 +119,7 @@ async def async_progress_update(
 
     try:
         async with session.post(
-            output_endpoint,
+            serverless.webhook_post_output,
             json=payload,
             headers=headers,
             timeout=aiohttp.ClientTimeout(total=10),

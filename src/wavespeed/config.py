@@ -12,92 +12,27 @@ _save_config_ignore = {
 }
 
 
-# Environment variable mapping from RunPod to Waverless
-_RUNPOD_TO_WAVERLESS_ENV_MAP = {
-    "RUNPOD_POD_ID": "WAVERLESS_WORKER_ID",
-    "RUNPOD_WEBHOOK_GET_JOB": "WAVERLESS_JOB_ENDPOINT",
-    "RUNPOD_WEBHOOK_POST_OUTPUT": "WAVERLESS_OUTPUT_ENDPOINT",
-    "RUNPOD_WEBHOOK_POST_STREAM": "WAVERLESS_STREAM_ENDPOINT",
-    "RUNPOD_WEBHOOK_PING": "WAVERLESS_PING_ENDPOINT",
-    "RUNPOD_AI_API_KEY": "WAVERLESS_API_KEY",
-    "RUNPOD_LOG_LEVEL": "WAVERLESS_LOG_LEVEL",
-    "RUNPOD_DEBUG_LEVEL": "WAVERLESS_LOG_LEVEL",
-    "RUNPOD_ENDPOINT_ID": "WAVERLESS_ENDPOINT_ID",
-    "RUNPOD_PROJECT_ID": "WAVERLESS_PROJECT_ID",
-    "RUNPOD_POD_HOSTNAME": "WAVERLESS_POD_HOSTNAME",
-    "RUNPOD_PING_INTERVAL": "WAVERLESS_PING_INTERVAL",
-    "RUNPOD_REALTIME_PORT": "WAVERLESS_REALTIME_PORT",
-    "RUNPOD_REALTIME_CONCURRENCY": "WAVERLESS_REALTIME_CONCURRENCY",
-}
-
-
-def detect_serverless_env() -> str | None:
-    """Detect the serverless environment type.
-
-    Returns:
-        The serverless environment type ("runpod", "waverless") or None
-        if not running in a known serverless environment.
-    """
-    # Check for RunPod environment
-    if os.environ.get("RUNPOD_POD_ID") or os.environ.get("RUNPOD_WEBHOOK_GET_JOB"):
-        return "runpod"
-
-    # Check for native Waverless environment
-    if os.environ.get("WAVERLESS_WORKER_ID") or os.environ.get(
-        "WAVERLESS_JOB_ENDPOINT"
-    ):
-        return "waverless"
-
-    return None
-
-
-def load_runpod_serverless_config() -> dict[str, Optional[str]]:
-    """Parse RunPod environment variables and set corresponding Waverless configs.
-
-    This function reads all RunPod-specific environment variables and maps
-    them to their Waverless equivalents. The mapped values are set in the
-    environment so that wavespeed serverless can use them transparently.
-
-    Returns:
-        A dictionary of the mapped environment variables and their values.
-    """
-    mapped_config: dict[str, Optional[str]] = {}
-
-    for runpod_var, waverless_var in _RUNPOD_TO_WAVERLESS_ENV_MAP.items():
-        value = os.environ.get(runpod_var)
-        if value is not None:
-            # Set the Waverless environment variable if not already set
-            if waverless_var not in os.environ:
-                os.environ[waverless_var] = value
-            mapped_config[waverless_var] = value
-
-    return mapped_config
-
-
-def get_serverless_env(key: str, default: Optional[str] = None) -> Optional[str]:
-    """Get serverless environment variable with WAVERLESS_ prefix.
-
-    Args:
-        key: The configuration key (without WAVERLESS_ prefix).
-        default: Default value if not found.
-
-    Returns:
-        The environment variable value or default.
-    """
-    return os.environ.get(f"WAVERLESS_{key}", default)
-
-
 class serverless:
-    """Serverless configuration options."""
+    """Serverless configuration options.
+
+    These attributes are populated by load_serverless_config() based on
+    the detected environment (RunPod or Waverless).
+    """
 
     # Worker identification
-    worker_id: Optional[str] = None
+    pod_id: Optional[str] = None
 
-    # API endpoints
-    job_endpoint: Optional[str] = None
-    output_endpoint: Optional[str] = None
-    stream_endpoint: Optional[str] = None
-    ping_endpoint: Optional[str] = None
+    # API endpoint templates (with $RUNPOD_POD_ID or $ID placeholder)
+    webhook_get_job: Optional[str] = None
+    webhook_post_output: Optional[str] = None
+    webhook_post_stream: Optional[str] = None
+    webhook_ping: Optional[str] = None
+
+    # Resolved API endpoints (with placeholders replaced by pod_id)
+    job_get_url: Optional[str] = None
+    job_done_url: Optional[str] = None
+    job_stream_url: Optional[str] = None
+    ping_url: Optional[str] = None
 
     # Authentication
     api_key: Optional[str] = None
@@ -116,5 +51,143 @@ class serverless:
     realtime_concurrency: int = 1
 
 
+def _detect_serverless_env() -> Optional[str]:
+    """Detect the serverless environment type.
+
+    Returns:
+        The serverless environment type ("runpod", "waverless") or None
+        if not running in a known serverless environment.
+    """
+    # Check for RunPod environment
+    if os.environ.get("RUNPOD_POD_ID"):
+        return "runpod"
+
+    # Check for native Waverless environment
+    if os.environ.get("WAVERLESS_POD_ID"):
+        return "waverless"
+
+    return None
+
+
+def _resolve_url(url_template: Optional[str], pod_id: str) -> Optional[str]:
+    """Replace pod ID placeholder in URL template.
+
+    Note: Only $RUNPOD_POD_ID is replaced here. The $ID placeholder is
+    replaced later at runtime with the actual job ID in http._handle_result.
+
+    Args:
+        url_template: URL template with $RUNPOD_POD_ID placeholder.
+        pod_id: The worker/pod ID to substitute.
+
+    Returns:
+        URL with pod ID placeholder replaced, or None if template is None.
+    """
+    if not url_template:
+        return None
+    return url_template.replace("$RUNPOD_POD_ID", pod_id)
+
+
+def _load_runpod_serverless_config() -> None:
+    """Load RunPod environment variables into serverless config."""
+    # Worker identification
+    serverless.pod_id = os.environ.get("RUNPOD_POD_ID") or ""
+
+    # API endpoint templates
+    serverless.webhook_get_job = os.environ.get("RUNPOD_WEBHOOK_GET_JOB")
+    serverless.webhook_post_output = os.environ.get("RUNPOD_WEBHOOK_POST_OUTPUT")
+    serverless.webhook_post_stream = os.environ.get("RUNPOD_WEBHOOK_POST_STREAM")
+    serverless.webhook_ping = os.environ.get("RUNPOD_WEBHOOK_PING")
+
+    # Resolved API endpoints (with pod_id substituted)
+    serverless.job_get_url = _resolve_url(serverless.webhook_get_job, serverless.pod_id)
+    serverless.job_done_url = _resolve_url(
+        serverless.webhook_post_output, serverless.pod_id
+    )
+    serverless.job_stream_url = _resolve_url(
+        serverless.webhook_post_stream, serverless.pod_id
+    )
+    serverless.ping_url = _resolve_url(serverless.webhook_ping, serverless.pod_id)
+
+    # Authentication
+    serverless.api_key = os.environ.get("RUNPOD_AI_API_KEY")
+
+    # Logging (try both log level vars)
+    log_level = os.environ.get("RUNPOD_LOG_LEVEL")
+    if not log_level:
+        log_level = os.environ.get("RUNPOD_DEBUG_LEVEL")
+    serverless.log_level = log_level or "INFO"
+
+    # Endpoint identification
+    serverless.endpoint_id = os.environ.get("RUNPOD_ENDPOINT_ID")
+    serverless.project_id = os.environ.get("RUNPOD_PROJECT_ID")
+    serverless.pod_hostname = os.environ.get("RUNPOD_POD_HOSTNAME")
+
+    # Timing and concurrency
+    ping_interval = os.environ.get("RUNPOD_PING_INTERVAL")
+    if ping_interval:
+        serverless.ping_interval = int(ping_interval)
+
+    realtime_port = os.environ.get("RUNPOD_REALTIME_PORT")
+    if realtime_port:
+        serverless.realtime_port = int(realtime_port)
+
+    realtime_concurrency = os.environ.get("RUNPOD_REALTIME_CONCURRENCY")
+    if realtime_concurrency:
+        serverless.realtime_concurrency = int(realtime_concurrency)
+
+
+def _load_waverless_serverless_config() -> None:
+    """Load Waverless environment variables into serverless config."""
+    # Worker identification
+    serverless.pod_id = os.environ.get("WAVERLESS_POD_ID") or ""
+
+    # API endpoint templates
+    serverless.webhook_get_job = os.environ.get("WAVERLESS_WEBHOOK_GET_JOB")
+    serverless.webhook_post_output = os.environ.get("WAVERLESS_WEBHOOK_POST_OUTPUT")
+    serverless.webhook_post_stream = os.environ.get("WAVERLESS_WEBHOOK_POST_STREAM")
+    serverless.webhook_ping = os.environ.get("WAVERLESS_WEBHOOK_PING")
+
+    # Resolved API endpoints (with pod_id substituted)
+    serverless.job_get_url = _resolve_url(serverless.webhook_get_job, serverless.pod_id)
+    serverless.job_done_url = _resolve_url(
+        serverless.webhook_post_output, serverless.pod_id
+    )
+    serverless.job_stream_url = _resolve_url(
+        serverless.webhook_post_stream, serverless.pod_id
+    )
+    serverless.ping_url = _resolve_url(serverless.webhook_ping, serverless.pod_id)
+
+    # Authentication
+    serverless.api_key = os.environ.get("WAVERLESS_API_KEY")
+
+    # Logging
+    serverless.log_level = os.environ.get("WAVERLESS_LOG_LEVEL", "INFO")
+
+    # Endpoint identification
+    serverless.endpoint_id = os.environ.get("WAVERLESS_ENDPOINT_ID")
+    serverless.project_id = os.environ.get("WAVERLESS_PROJECT_ID")
+    serverless.pod_hostname = os.environ.get("WAVERLESS_POD_HOSTNAME")
+
+    # Timing and concurrency
+    ping_interval = os.environ.get("WAVERLESS_PING_INTERVAL")
+    if ping_interval:
+        serverless.ping_interval = int(ping_interval)
+
+    realtime_port = os.environ.get("WAVERLESS_REALTIME_PORT")
+    if realtime_port:
+        serverless.realtime_port = int(realtime_port)
+
+    realtime_concurrency = os.environ.get("WAVERLESS_REALTIME_CONCURRENCY")
+    if realtime_concurrency:
+        serverless.realtime_concurrency = int(realtime_concurrency)
+
+
 # adds patch, save_config, etc
 install_config_module(sys.modules[__name__])
+
+# Auto-detect and load serverless config at import time
+_detected_env = _detect_serverless_env()
+if _detected_env == "runpod":
+    _load_runpod_serverless_config()
+elif _detected_env == "waverless":
+    _load_waverless_serverless_config()

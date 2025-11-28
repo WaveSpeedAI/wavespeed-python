@@ -111,13 +111,9 @@ class TestWaverlessLogger(unittest.TestCase):
     @patch("sys.stdout", new_callable=io.StringIO)
     def test_info_log_output_local(self, mock_stdout):
         """Test info logging output in local mode."""
-        with patch(
-            "wavespeed.serverless.modules.logger.get_serverless_env"
-        ) as mock_env:
-            # Return "INFO" for LOG_LEVEL, None for ENDPOINT_ID
-            mock_env.side_effect = (
-                lambda key, default="": "INFO" if key == "LOG_LEVEL" else None
-            )
+        with patch("wavespeed.serverless.modules.logger.serverless") as mock_serverless:
+            mock_serverless.log_level = "INFO"
+            mock_serverless.endpoint_id = None
 
             WaverlessLogger._instance = None
             logger = WaverlessLogger()
@@ -132,12 +128,9 @@ class TestWaverlessLogger(unittest.TestCase):
     @patch("sys.stdout", new_callable=io.StringIO)
     def test_info_log_with_job_id(self, mock_stdout):
         """Test logging with job ID."""
-        with patch(
-            "wavespeed.serverless.modules.logger.get_serverless_env"
-        ) as mock_env:
-            mock_env.side_effect = (
-                lambda key, default="": "INFO" if key == "LOG_LEVEL" else None
-            )
+        with patch("wavespeed.serverless.modules.logger.serverless") as mock_serverless:
+            mock_serverless.log_level = "INFO"
+            mock_serverless.endpoint_id = None
 
             WaverlessLogger._instance = None
             logger = WaverlessLogger()
@@ -152,12 +145,9 @@ class TestWaverlessLogger(unittest.TestCase):
     @patch("sys.stderr", new_callable=io.StringIO)
     def test_error_logs_to_stderr(self, mock_stderr):
         """Test that error logs go to stderr."""
-        with patch(
-            "wavespeed.serverless.modules.logger.get_serverless_env"
-        ) as mock_env:
-            mock_env.side_effect = (
-                lambda key, default="": "INFO" if key == "LOG_LEVEL" else None
-            )
+        with patch("wavespeed.serverless.modules.logger.serverless") as mock_serverless:
+            mock_serverless.log_level = "INFO"
+            mock_serverless.endpoint_id = None
 
             WaverlessLogger._instance = None
             logger = WaverlessLogger()
@@ -172,13 +162,9 @@ class TestWaverlessLogger(unittest.TestCase):
     @patch("sys.stdout", new_callable=io.StringIO)
     def test_json_output_in_deployed_mode(self, mock_stdout):
         """Test JSON output when endpoint ID is set."""
-        with patch(
-            "wavespeed.serverless.modules.logger.get_serverless_env"
-        ) as mock_env:
-            mock_env.side_effect = lambda key, default="": {
-                "LOG_LEVEL": "INFO",
-                "ENDPOINT_ID": "test_endpoint",
-            }.get(key, default)
+        with patch("wavespeed.serverless.modules.logger.serverless") as mock_serverless:
+            mock_serverless.log_level = "INFO"
+            mock_serverless.endpoint_id = "test_endpoint"
 
             WaverlessLogger._instance = None
             logger = WaverlessLogger()
@@ -196,12 +182,9 @@ class TestWaverlessLogger(unittest.TestCase):
     @patch("sys.stdout", new_callable=io.StringIO)
     def test_debug_not_logged_at_info_level(self, mock_stdout):
         """Test that debug messages are not logged at INFO level."""
-        with patch(
-            "wavespeed.serverless.modules.logger.get_serverless_env"
-        ) as mock_env:
-            mock_env.side_effect = (
-                lambda key, default="": "INFO" if key == "LOG_LEVEL" else None
-            )
+        with patch("wavespeed.serverless.modules.logger.serverless") as mock_serverless:
+            mock_serverless.log_level = "INFO"
+            mock_serverless.endpoint_id = None
 
             WaverlessLogger._instance = None
             logger = WaverlessLogger()

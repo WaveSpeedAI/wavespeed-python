@@ -6,7 +6,7 @@ from datetime import datetime
 from enum import IntEnum
 from typing import Optional
 
-from wavespeed.config import get_serverless_env
+from wavespeed.config import serverless
 
 
 class LogLevel(IntEnum):
@@ -52,10 +52,10 @@ class WaverlessLogger:
         return cls._instance
 
     def _initialize(self) -> None:
-        """Initialize the logger with environment settings."""
-        level_str = get_serverless_env("LOG_LEVEL", "INFO")
+        """Initialize the logger with config settings."""
+        level_str = serverless.log_level if serverless.log_level else "INFO"
         self._level = _LEVEL_MAP.get(level_str.upper(), LogLevel.INFO)
-        self._endpoint_id = get_serverless_env("ENDPOINT_ID")
+        self._endpoint_id = serverless.endpoint_id if serverless.endpoint_id else None
 
     def set_level(self, level: str | LogLevel) -> None:
         """Set the log level.

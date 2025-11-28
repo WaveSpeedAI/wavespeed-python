@@ -25,7 +25,8 @@ classifiers = [
 dynamic = ["version"]
 
 dependencies = [
-    "aiohttp>=3.8.0",
+    "aiohttp[speedups]>=3.9.3",
+    "aiohttp-retry>=2.8.3",
     "requests>=2.25.0",
     "boto3>=1.26.165",
 ]

@@ -21,8 +21,8 @@ class TestIsLocal(unittest.TestCase):
         """Test _is_local returns True when no job endpoint is configured."""
         config = {"_args": None}
 
-        with patch("wavespeed.serverless.worker.get_serverless_env") as mock_env:
-            mock_env.return_value = None  # No job endpoint
+        with patch("wavespeed.serverless.worker.serverless") as mock_serverless:
+            mock_serverless.webhook_get_job = None
 
             self.assertTrue(_is_local(config))
 
@@ -30,8 +30,8 @@ class TestIsLocal(unittest.TestCase):
         """Test _is_local returns False when job endpoint is configured."""
         config = {"_args": None}
 
-        with patch("wavespeed.serverless.worker.get_serverless_env") as mock_env:
-            mock_env.return_value = "http://test.endpoint/jobs"
+        with patch("wavespeed.serverless.worker.serverless") as mock_serverless:
+            mock_serverless.webhook_get_job = "http://test.endpoint/jobs"
 
             self.assertFalse(_is_local(config))
 
@@ -40,8 +40,8 @@ class TestIsLocal(unittest.TestCase):
         args = Namespace(test_input='{"input": {}}')
         config = {"_args": args}
 
-        with patch("wavespeed.serverless.worker.get_serverless_env") as mock_env:
-            mock_env.return_value = "http://test.endpoint/jobs"
+        with patch("wavespeed.serverless.worker.serverless") as mock_serverless:
+            mock_serverless.webhook_get_job = "http://test.endpoint/jobs"
 
             # Even with endpoint set, test_input should make it local
             self.assertTrue(_is_local(config))
@@ -79,17 +79,15 @@ class TestRunWorker(unittest.TestCase):
             "_args": None,
         }
 
-        with patch("wavespeed.serverless.worker.get_serverless_env") as mock_env, patch(
+        with patch("wavespeed.serverless.worker.serverless") as mock_serverless, patch(
             "wavespeed.serverless.worker.Heartbeat"
         ) as mock_heartbeat, patch(
             "wavespeed.serverless.worker.JobScaler"
         ) as mock_scaler, patch(
             "wavespeed.serverless.worker.log"
         ):
-            mock_env.side_effect = lambda key, default="not set": {
-                "JOB_ENDPOINT": "http://test.endpoint/jobs",
-                "WORKER_ID": "worker_123",
-            }.get(key, default)
+            mock_serverless.webhook_get_job = "http://test.endpoint/jobs"
+            mock_serverless.pod_id = "worker_123"
 
             mock_heartbeat_instance = MagicMock()
             mock_heartbeat.return_value = mock_heartbeat_instance
@@ -115,17 +113,15 @@ class TestRunWorker(unittest.TestCase):
             "_args": None,
         }
 
-        with patch("wavespeed.serverless.worker.get_serverless_env") as mock_env, patch(
+        with patch("wavespeed.serverless.worker.serverless") as mock_serverless, patch(
             "wavespeed.serverless.worker.Heartbeat"
         ) as mock_heartbeat, patch(
             "wavespeed.serverless.worker.JobScaler"
         ) as mock_scaler, patch(
             "wavespeed.serverless.worker.log"
         ):
-            mock_env.side_effect = lambda key, default="not set": {
-                "JOB_ENDPOINT": "http://test.endpoint/jobs",
-                "WORKER_ID": "worker_123",
-            }.get(key, default)
+            mock_serverless.webhook_get_job = "http://test.endpoint/jobs"
+            mock_serverless.pod_id = "worker_123"
 
             mock_heartbeat_instance = MagicMock()
             mock_heartbeat.return_value = mock_heartbeat_instance
@@ -151,17 +147,15 @@ class TestRunWorker(unittest.TestCase):
             "_args": None,
         }
 
-        with patch("wavespeed.serverless.worker.get_serverless_env") as mock_env, patch(
+        with patch("wavespeed.serverless.worker.serverless") as mock_serverless, patch(
             "wavespeed.serverless.worker.Heartbeat"
         ) as mock_heartbeat, patch(
             "wavespeed.serverless.worker.JobScaler"
         ) as mock_scaler, patch(
             "wavespeed.serverless.worker.log"
         ):
-            mock_env.side_effect = lambda key, default="not set": {
-                "JOB_ENDPOINT": "http://test.endpoint/jobs",
-                "WORKER_ID": "worker_123",
-            }.get(key, default)
+            mock_serverless.webhook_get_job = "http://test.endpoint/jobs"
+            mock_serverless.pod_id = "worker_123"
 
             mock_heartbeat_instance = MagicMock()
             mock_heartbeat.return_value = mock_heartbeat_instance
