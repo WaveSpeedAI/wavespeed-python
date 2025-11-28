@@ -1,6 +1,22 @@
-# wavespeed-python
+<div align="center">
+  <a href="https://wavespeed.ai" target="_blank" rel="noopener noreferrer">
+    <img src="https://raw.githubusercontent.com/WaveSpeedAI/waverless/main/docs/images/wavespeed-dark-logo.png" alt="WaveSpeedAI logo" width="200"/>
+  </a>
 
-WaveSpeedAI Python Client — Official Python SDK for WaveSpeedAI inference platform. This library provides a clean, unified, and high-performance API and serverless integration layer for your applications.
+  <h1>WaveSpeedAI Python SDK</h1>
+
+  <p>
+    <strong>Official Python SDK for the WaveSpeedAI inference platform</strong>
+  </p>
+
+  <p>
+    <a href="https://wavespeed.ai" target="_blank" rel="noopener noreferrer">🌐 Visit wavespeed.ai</a> •
+    <a href="https://wavespeed.ai/docs">📖 Documentation</a> •
+    <a href="https://github.com/WaveSpeedAI/wavespeed-python/issues">💬 Issues</a>
+  </p>
+</div>
+
+---
 
 ## Installation
 
@@ -8,9 +24,63 @@ WaveSpeedAI Python Client — Official Python SDK for WaveSpeedAI inference plat
 pip install wavespeed
 ```
 
+## API Client
+
+Run WaveSpeed AI models with a simple API:
+
+```python
+import wavespeed
+
+output = wavespeed.run(
+    "wavespeed-ai/z-image/turbo",
+    input={"prompt": "A cat holds a sign that says 'Hello World'"},
+)
+
+print(output["outputs"][0])  # Output URL
+```
+
+### Authentication
+
+Set your API key via environment variable:
+
+```bash
+export WAVESPEED_API_KEY="your-api-key"
+```
+
+Or pass it directly:
+
+```python
+from wavespeed import Client
+
+client = Client(api_key="your-api-key")
+output = client.run("wavespeed-ai/z-image/turbo", input={"prompt": "A cat holds a sign that says 'Hello World'"})
+```
+
+### Options
+
+```python
+output = wavespeed.run(
+    "wavespeed-ai/z-image/turbo",
+    input={"prompt": "A cat holds a sign that says 'Hello World'"},
+    timeout=600.0       # Max wait time in seconds (default: None)
+    poll_interval=1.0,  # Status check interval (default: 1.0)
+)
+```
+
+### Upload Files
+
+Upload images, videos, or audio files:
+
+```python
+import wavespeed
+
+url = wavespeed.upload("/path/to/image.png")
+print(url)
+```
+
 ## Serverless Worker
 
-Build serverless workers compatible with RunPod infrastructure.
+Build serverless workers for the WaveSpeed platform.
 
 ### Basic Handler
 
@@ -121,14 +191,20 @@ curl -X POST http://localhost:8000/run \
 
 ## Environment Variables
 
-The SDK auto-detects RunPod or native Waverless environments:
+### API Client
 
 | Variable | Description |
 |----------|-------------|
-| `RUNPOD_WEBHOOK_GET_JOB` | Job fetch endpoint |
-| `RUNPOD_WEBHOOK_POST_OUTPUT` | Result submission endpoint |
-| `RUNPOD_AI_API_KEY` | API authentication key |
-| `RUNPOD_POD_ID` | Worker/pod identifier |
+| `WAVESPEED_API_KEY` | WaveSpeed API key |
+
+### Serverless Worker
+
+| Variable | Description |
+|----------|-------------|
+| `WAVERLESS_POD_ID` | Worker/pod identifier |
+| `WAVERLESS_API_KEY` | API authentication key |
+| `WAVERLESS_WEBHOOK_GET_JOB` | Job fetch endpoint |
+| `WAVERLESS_WEBHOOK_POST_OUTPUT` | Result submission endpoint |
 
 ## License
 

@@ -12,6 +12,16 @@ _save_config_ignore = {
 }
 
 
+class api:
+    """API client configuration options."""
+
+    # Authentication
+    api_key: Optional[str] = os.environ.get("WAVESPEED_API_KEY")
+
+    # API base URL
+    base_url: str = "https://api.wavespeed.ai"
+
+
 class serverless:
     """Serverless configuration options.
 
