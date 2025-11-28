@@ -62,7 +62,7 @@ output = client.run("wavespeed-ai/z-image/turbo", input={"prompt": "A cat holds 
 output = wavespeed.run(
     "wavespeed-ai/z-image/turbo",
     input={"prompt": "A cat holds a sign that says 'Hello World'"},
-    timeout=600.0       # Max wait time in seconds (default: None)
+    timeout=36000.0     # Max wait time in seconds (default: 36000.0)
     poll_interval=1.0,  # Status check interval (default: 1.0)
 )
 ```
@@ -157,6 +157,19 @@ python handler.py --test_input '{"input": {"prompt": "hello"}}'
 # Using test_input.json file (auto-detected)
 echo '{"input": {"prompt": "hello"}}' > test_input.json
 python handler.py
+```
+
+### Running Tests
+
+```bash
+# Run all tests
+python -m pytest
+
+# Run a single test file
+python -m pytest tests/test_api.py
+
+# Run a specific test
+python -m pytest tests/test_api.py::TestClient::test_run_success -v
 ```
 
 ### FastAPI Development Server
