@@ -41,7 +41,7 @@ print(output["outputs"][0])  # Output URL
 
 ### Authentication
 
-Set your API key via environment variable:
+Set your API key via environment variable (You can get your API key from [https://wavespeed.ai/accesskey](https://wavespeed.ai/accesskey)):
 
 ```bash
 export WAVESPEED_API_KEY="your-api-key"
