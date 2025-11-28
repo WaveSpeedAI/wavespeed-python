@@ -19,7 +19,7 @@ class Client:
 
     Example:
         client = Client(api_key="your-api-key")
-        output = client.run("wavespeed-ai/z-image/turbo", input={"prompt": "Hello"})
+        output = client.run("wavespeed-ai/z-image/turbo", input={"prompt": "Cat"})
     """
 
     def __init__(
