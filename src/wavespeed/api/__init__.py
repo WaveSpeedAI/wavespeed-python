@@ -73,11 +73,12 @@ def run(
     )
 
 
-def upload(file: str | BinaryIO) -> str:
+def upload(file: str | BinaryIO, *, timeout: float | None = None) -> str:
     """Upload a file to WaveSpeed.
 
     Args:
         file: File path string or file-like object to upload.
+        timeout: Total API call timeout in seconds.
 
     Returns:
         URL of the uploaded file.
@@ -91,4 +92,4 @@ def upload(file: str | BinaryIO) -> str:
         url = wavespeed.upload("/path/to/image.png")
         print(url)
     """
-    return _get_default_client().upload(file)
+    return _get_default_client().upload(file, timeout=timeout)

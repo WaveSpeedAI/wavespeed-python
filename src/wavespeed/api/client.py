@@ -15,6 +15,7 @@ class Client:
     Args:
         api_key: WaveSpeed API key. If not provided, uses wavespeed.config.api.api_key.
         base_url: Base URL for the API. If not provided, uses wavespeed.config.api.base_url.
+        connection_timeout: Timeout for HTTP requests in seconds.
 
     Example:
         client = Client(api_key="your-api-key")
@@ -25,10 +26,12 @@ class Client:
         self,
         api_key: str | None = None,
         base_url: str | None = None,
+        connection_timeout: float | None = None,
     ) -> None:
         """Initialize the client."""
         self.api_key = api_key or api_config.api_key
         self.base_url = (base_url or api_config.base_url).rstrip("/")
+        self.connection_timeout = connection_timeout or api_config.connection_timeout
 
     def _get_headers(self) -> dict[str, str]:
         """Get request headers with authentication."""
@@ -58,7 +61,9 @@ class Client:
         url = f"{self.base_url}/api/v3/{model}"
         body = input or {}
 
-        response = requests.post(url, json=body, headers=self._get_headers())
+        response = requests.post(
+            url, json=body, headers=self._get_headers(), timeout=self.connection_timeout
+        )
 
         if response.status_code != 200:
             raise RuntimeError(
@@ -88,7 +93,9 @@ class Client:
         """
         url = f"{self.base_url}/api/v3/predictions/{request_id}/result"
 
-        response = requests.get(url, headers=self._get_headers())
+        response = requests.get(
+            url, headers=self._get_headers(), timeout=self.connection_timeout
+        )
 
         if response.status_code != 200:
             raise RuntimeError(
@@ -166,11 +173,12 @@ class Client:
         request_id = self._submit(model, input)
         return self._wait(request_id, timeout, poll_interval)
 
-    def upload(self, file: str | BinaryIO) -> str:
+    def upload(self, file: str | BinaryIO, *, timeout: float | None = None) -> str:
         """Upload a file to WaveSpeed.
 
         Args:
             file: File path string or file-like object to upload.
+            timeout: Total API call timeout in seconds.
 
         Returns:
             URL of the uploaded file.
@@ -192,19 +200,25 @@ class Client:
 
         url = f"{self.base_url}/api/v3/media/upload/binary"
         headers = {"Authorization": f"Bearer {self.api_key}"}
+        timeout = timeout or api_config.timeout
+        request_timeout = (min(self.connection_timeout, timeout), timeout)
 
         if isinstance(file, str):
             if not os.path.exists(file):
                 raise FileNotFoundError(f"File not found: {file}")
             with open(file, "rb") as f:
                 files = {"file": (os.path.basename(file), f)}
-                response = requests.post(url, headers=headers, files=files)
+                response = requests.post(
+                    url, headers=headers, files=files, timeout=request_timeout
+                )
         else:
             filename = getattr(file, "name", "upload")
             if isinstance(filename, str) and os.path.sep in filename:
                 filename = os.path.basename(filename)
             files = {"file": (filename, file)}
-            response = requests.post(url, headers=headers, files=files)
+            response = requests.post(
+                url, headers=headers, files=files, timeout=request_timeout
+            )
 
         if response.status_code != 200:
             raise RuntimeError(

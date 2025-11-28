@@ -21,6 +21,12 @@ class api:
     # API base URL
     base_url: str = "https://api.wavespeed.ai"
 
+    # Connection timeout in seconds
+    connection_timeout: float = 10.0
+
+    # Total API call timeout in seconds
+    timeout: float = 36000.0
+
 
 class serverless:
     """Serverless configuration options.
