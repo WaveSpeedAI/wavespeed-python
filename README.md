@@ -146,6 +146,25 @@ def handler(job):
     return {"output": "done"}
 ```
 
+### Concurrent Execution
+
+Enable concurrent job processing with `concurrency_modifier`:
+
+```python
+import wavespeed.serverless as serverless
+
+def handler(job):
+    return {"output": job["input"]["data"]}
+
+def concurrency_modifier(current_concurrency):
+    return 2  # Process 2 jobs concurrently
+
+serverless.start({
+    "handler": handler,
+    "concurrency_modifier": concurrency_modifier
+})
+```
+
 ## Local Development
 
 ### Test with JSON Input
