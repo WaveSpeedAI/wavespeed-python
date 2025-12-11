@@ -62,8 +62,38 @@ output = client.run("wavespeed-ai/z-image/turbo", input={"prompt": "Cat"})
 output = wavespeed.run(
     "wavespeed-ai/z-image/turbo",
     input={"prompt": "Cat"},
-    timeout=36000.0     # Max wait time in seconds (default: 36000.0)
-    poll_interval=1.0,  # Status check interval (default: 1.0)
+    timeout=36000.0,       # Max wait time in seconds (default: 36000.0)
+    poll_interval=1.0,     # Status check interval (default: 1.0)
+    enable_sync_mode=False, # Single request mode, no polling (default: False)
+)
+```
+
+### Sync Mode
+
+Use `enable_sync_mode=True` for a single request that waits for the result (no polling).
+
+> **Note:** Not all models support sync mode. Check the model documentation for availability.
+
+```python
+output = wavespeed.run(
+    "wavespeed-ai/z-image/turbo",
+    input={"prompt": "Cat"},
+    enable_sync_mode=True,
+)
+```
+
+### Retry Configuration
+
+Configure retries at the client level:
+
+```python
+from wavespeed import Client
+
+client = Client(
+    api_key="your-api-key",
+    max_retries=0,            # Task-level retries (default: 0)
+    max_connection_retries=5, # HTTP connection retries (default: 5)
+    retry_interval=1.0,       # Base delay between retries in seconds (default: 1.0)
 )
 ```
 
