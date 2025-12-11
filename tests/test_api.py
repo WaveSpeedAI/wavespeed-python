@@ -29,6 +29,10 @@ class TestClient(unittest.TestCase):
         """Test client initialization from config."""
         mock_config.api_key = "config-key"
         mock_config.base_url = "https://api.wavespeed.ai"
+        mock_config.connection_timeout = 10.0
+        mock_config.max_retries = 0
+        mock_config.max_connection_retries = 5
+        mock_config.retry_interval = 1.0
         client = Client()
         self.assertEqual(client.api_key, "config-key")
 
@@ -56,9 +60,12 @@ class TestClient(unittest.TestCase):
         mock_post.return_value = mock_response
 
         client = Client(api_key="test-key")
-        request_id = client._submit("wavespeed-ai/z-image/turbo", {"prompt": "test"})
+        request_id, result = client._submit(
+            "wavespeed-ai/z-image/turbo", {"prompt": "test"}
+        )
 
         self.assertEqual(request_id, "req-123")
+        self.assertIsNone(result)
         mock_post.assert_called_once()
         call_args = mock_post.call_args
         self.assertIn("wavespeed-ai/z-image/turbo", call_args[0][0])
@@ -178,6 +185,11 @@ class TestModuleLevelRun(unittest.TestCase):
         # Mock config
         mock_config.api_key = "config-key"
         mock_config.base_url = "https://api.wavespeed.ai"
+        mock_config.connection_timeout = 10.0
+        mock_config.timeout = 36000.0
+        mock_config.max_retries = 0
+        mock_config.max_connection_retries = 5
+        mock_config.retry_interval = 1.0
 
         # Reset default client
         wavespeed.api._default_client = None

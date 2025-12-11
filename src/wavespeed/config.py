@@ -27,6 +27,15 @@ class api:
     # Total API call timeout in seconds
     timeout: float = 36000.0
 
+    # Maximum number of retries for the entire operation (task-level retries)
+    max_retries: int = 0
+
+    # Maximum number of retries for individual HTTP requests (connection errors, timeouts)
+    max_connection_retries: int = 5
+
+    # Base interval between retries in seconds (actual delay = retry_interval * attempt)
+    retry_interval: float = 1.0
+
 
 class serverless:
     """Serverless configuration options.

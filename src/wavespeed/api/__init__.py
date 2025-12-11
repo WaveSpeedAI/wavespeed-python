@@ -41,6 +41,8 @@ def run(
     *,
     timeout: float | None = None,
     poll_interval: float = 1.0,
+    enable_sync_mode: bool = False,
+    max_retries: int | None = None,
 ) -> dict:
     """Run a model and wait for the output.
 
@@ -49,6 +51,8 @@ def run(
         input: Input parameters for the model.
         timeout: Maximum time to wait for completion (None = no timeout).
         poll_interval: Interval between status checks in seconds.
+        enable_sync_mode: If True, use synchronous mode (single request).
+        max_retries: Maximum retries for this request (overrides default setting).
 
     Returns:
         Dict containing "outputs" array with model outputs.
@@ -64,12 +68,28 @@ def run(
             input={"prompt": "A cat sitting on a windowsill"}
         )
         print(output["outputs"][0])  # First output URL
+
+        # With sync mode
+        output = wavespeed.run(
+            "wavespeed-ai/z-image/turbo",
+            input={"prompt": "A cat"},
+            enable_sync_mode=True
+        )
+
+        # With retry
+        output = wavespeed.run(
+            "wavespeed-ai/z-image/turbo",
+            input={"prompt": "A cat"},
+            max_retries=3
+        )
     """
     return _get_default_client().run(
         model,
         input=input,
         timeout=timeout,
         poll_interval=poll_interval,
+        enable_sync_mode=enable_sync_mode,
+        max_retries=max_retries,
     )
 
 
