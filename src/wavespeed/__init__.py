@@ -10,7 +10,7 @@ Example usage:
 
     output = wavespeed.run(
         "wavespeed-ai/z-image/turbo",
-        input={"prompt": "A beautiful sunset"}
+        {"prompt": "A beautiful sunset"}
     )
     print(output["outputs"][0])
 """

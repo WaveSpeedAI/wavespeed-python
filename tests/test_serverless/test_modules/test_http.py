@@ -132,6 +132,7 @@ class TestFetchJobs(IsolatedAsyncioTestCase):
         mock_response.content_type = "application/json"
         mock_response.content_length = 100
         mock_response.json = AsyncMock(return_value={"id": "job_1", "input": {"n": 1}})
+        mock_response.raise_for_status = MagicMock()
         mock_response.__aenter__.return_value = mock_response
         mock_response.__aexit__.return_value = None
 
@@ -163,6 +164,7 @@ class TestFetchJobs(IsolatedAsyncioTestCase):
                 {"id": "job_2", "input": {"n": 2}},
             ]
         )
+        mock_response.raise_for_status = MagicMock()
         mock_response.__aenter__.return_value = mock_response
         mock_response.__aexit__.return_value = None
 
@@ -287,6 +289,7 @@ class TestFetchJobs(IsolatedAsyncioTestCase):
         mock_response.content_type = "application/json"
         mock_response.content_length = 10
         mock_response.json = AsyncMock(return_value=[])
+        mock_response.raise_for_status = MagicMock()
         mock_response.__aenter__.return_value = mock_response
         mock_response.__aexit__.return_value = None
 

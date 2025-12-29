@@ -7,7 +7,7 @@ Example usage:
 
     output = wavespeed.run(
         "wavespeed-ai/z-image/turbo",
-        input={"prompt": "A beautiful sunset over mountains"}
+        {"prompt": "A beautiful sunset over mountains"}
     )
 
     print(output["outputs"][0])  # First output URL
@@ -65,27 +65,27 @@ def run(
     Example:
         output = wavespeed.run(
             "wavespeed-ai/z-image/turbo",
-            input={"prompt": "A cat sitting on a windowsill"}
+            {"prompt": "A cat sitting on a windowsill"}
         )
         print(output["outputs"][0])  # First output URL
 
         # With sync mode
         output = wavespeed.run(
             "wavespeed-ai/z-image/turbo",
-            input={"prompt": "A cat"},
+            {"prompt": "A cat"},
             enable_sync_mode=True
         )
 
         # With retry
         output = wavespeed.run(
             "wavespeed-ai/z-image/turbo",
-            input={"prompt": "A cat"},
+            {"prompt": "A cat"},
             max_retries=3
         )
     """
     return _get_default_client().run(
         model,
-        input=input,
+        input,
         timeout=timeout,
         poll_interval=poll_interval,
         enable_sync_mode=enable_sync_mode,

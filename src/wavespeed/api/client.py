@@ -23,13 +23,13 @@ class Client:
 
     Example:
         client = Client(api_key="your-api-key")
-        output = client.run("wavespeed-ai/z-image/turbo", input={"prompt": "Cat"})
+        output = client.run("wavespeed-ai/z-image/turbo", {"prompt": "Cat"})
 
         # With sync mode (single request, waits for result)
-        output = client.run("wavespeed-ai/z-image/turbo", input={"prompt": "Cat"}, enable_sync_mode=True)
+        output = client.run("wavespeed-ai/z-image/turbo", {"prompt": "Cat"}, enable_sync_mode=True)
 
         # With retry
-        output = client.run("wavespeed-ai/z-image/turbo", input={"prompt": "Cat"}, max_retries=3)
+        output = client.run("wavespeed-ai/z-image/turbo", {"prompt": "Cat"}, max_retries=3)
     """
 
     def __init__(

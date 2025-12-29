@@ -118,7 +118,7 @@ class TestClient(unittest.TestCase):
         mock_get.return_value = mock_get_response
 
         client = Client(api_key="test-key")
-        result = client.run("wavespeed-ai/z-image/turbo", input={"prompt": "test"})
+        result = client.run("wavespeed-ai/z-image/turbo", {"prompt": "test"})
 
         self.assertEqual(result["outputs"], ["https://example.com/out.png"])
 
@@ -142,7 +142,7 @@ class TestClient(unittest.TestCase):
 
         client = Client(api_key="test-key")
         with self.assertRaises(RuntimeError) as ctx:
-            client.run("wavespeed-ai/z-image/turbo", input={"prompt": "test"})
+            client.run("wavespeed-ai/z-image/turbo", {"prompt": "test"})
         self.assertIn("Model error", str(ctx.exception))
 
     @patch("wavespeed.api.client.time.time")
@@ -168,9 +168,7 @@ class TestClient(unittest.TestCase):
 
         client = Client(api_key="test-key")
         with self.assertRaises(TimeoutError) as ctx:
-            client.run(
-                "wavespeed-ai/z-image/turbo", input={"prompt": "test"}, timeout=10
-            )
+            client.run("wavespeed-ai/z-image/turbo", {"prompt": "test"}, timeout=10)
         self.assertIn("timed out", str(ctx.exception))
 
 
@@ -208,7 +206,7 @@ class TestModuleLevelRun(unittest.TestCase):
         }
         mock_get.return_value = mock_get_response
 
-        result = wavespeed.run("wavespeed-ai/z-image/turbo", input={"prompt": "test"})
+        result = wavespeed.run("wavespeed-ai/z-image/turbo", {"prompt": "test"})
         self.assertEqual(result["outputs"], ["https://example.com/out.png"])
 
 
@@ -342,7 +340,7 @@ class TestRealAPI(unittest.TestCase):
 
         output = wavespeed.run(
             "wavespeed-ai/z-image/turbo",
-            input={"prompt": "A simple red circle on white background"},
+            {"prompt": "A simple red circle on white background"},
         )
 
         self.assertIn("outputs", output)

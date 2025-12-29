@@ -2,7 +2,7 @@
 
 import json
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import IntEnum
 from typing import Optional
 
@@ -113,7 +113,9 @@ class WaverlessLogger:
                 "requestId": job_id or "N/A",
                 "message": message,
                 "level": level.name,
-                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "timestamp": datetime.now(timezone.utc)
+                .isoformat()
+                .replace("+00:00", "Z"),
             }
             return json.dumps(log_data)
         else:

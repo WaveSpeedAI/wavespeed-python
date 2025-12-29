@@ -108,7 +108,7 @@ class TestJobScalerAsync(IsolatedAsyncioTestCase):
 
             scaler = JobScaler(config)
             scaler.job_progress = mock_progress_instance
-            scaler.jobs_queue = AsyncMock()
+            scaler.jobs_queue = MagicMock()
 
             # Override the jobs_handler directly since __init__ already captured handle_job
             mock_handle = AsyncMock()
@@ -132,7 +132,7 @@ class TestJobScalerAsync(IsolatedAsyncioTestCase):
 
             scaler = JobScaler(config)
             scaler.job_progress = mock_progress_instance
-            scaler.jobs_queue = AsyncMock()
+            scaler.jobs_queue = MagicMock()
 
             # Override the jobs_handler directly since __init__ already captured handle_job
             mock_handle = AsyncMock()

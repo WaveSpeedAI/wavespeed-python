@@ -33,7 +33,7 @@ import wavespeed
 
 output = wavespeed.run(
     "wavespeed-ai/z-image/turbo",
-    input={"prompt": "Cat"},
+    {"prompt": "Cat"},
 )
 
 print(output["outputs"][0])  # Output URL
@@ -53,7 +53,7 @@ Or pass it directly:
 from wavespeed import Client
 
 client = Client(api_key="your-api-key")
-output = client.run("wavespeed-ai/z-image/turbo", input={"prompt": "Cat"})
+output = client.run("wavespeed-ai/z-image/turbo", {"prompt": "Cat"})
 ```
 
 ### Options
@@ -61,7 +61,7 @@ output = client.run("wavespeed-ai/z-image/turbo", input={"prompt": "Cat"})
 ```python
 output = wavespeed.run(
     "wavespeed-ai/z-image/turbo",
-    input={"prompt": "Cat"},
+    {"prompt": "Cat"},
     timeout=36000.0,       # Max wait time in seconds (default: 36000.0)
     poll_interval=1.0,     # Status check interval (default: 1.0)
     enable_sync_mode=False, # Single request mode, no polling (default: False)
@@ -77,7 +77,7 @@ Use `enable_sync_mode=True` for a single request that waits for the result (no p
 ```python
 output = wavespeed.run(
     "wavespeed-ai/z-image/turbo",
-    input={"prompt": "Cat"},
+    {"prompt": "Cat"},
     enable_sync_mode=True,
 )
 ```
