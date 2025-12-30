@@ -179,7 +179,8 @@ class Client:
 
                 if response.status_code != 200:
                     raise RuntimeError(
-                        f"Failed to get result: HTTP {response.status_code}: {response.text}"
+                        f"Failed to get result for task {request_id}: "
+                        f"HTTP {response.status_code}: {response.text}"
                     )
 
                 return response.json()
@@ -199,7 +200,8 @@ class Client:
                     time.sleep(delay)
                 else:
                     raise RuntimeError(
-                        f"Failed to get result after {self.max_connection_retries + 1} attempts"
+                        f"Failed to get result for task {request_id} "
+                        f"after {self.max_connection_retries + 1} attempts"
                     ) from e
 
     def _wait(
@@ -229,7 +231,9 @@ class Client:
             if timeout is not None:
                 elapsed = time.time() - start_time
                 if elapsed >= timeout:
-                    raise TimeoutError(f"Prediction timed out after {timeout} seconds")
+                    raise TimeoutError(
+                        f"Prediction timed out after {timeout} seconds (task_id: {request_id})"
+                    )
 
             result = self._get_result(request_id, timeout=timeout)
             data = result.get("data", {})
@@ -240,7 +244,9 @@ class Client:
 
             if status == "failed":
                 error = data.get("error") or "Unknown error"
-                raise RuntimeError(f"Prediction failed: {error}")
+                raise RuntimeError(
+                    f"Prediction failed (task_id: {request_id}): {error}"
+                )
 
             time.sleep(poll_interval)
 
