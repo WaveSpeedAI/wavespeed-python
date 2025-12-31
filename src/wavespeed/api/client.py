@@ -312,6 +312,15 @@ class Client:
 
                 if enable_sync_mode:
                     # In sync mode, extract outputs from the result
+                    status = sync_result.get("data", {}).get("status")
+                    if status != "completed":
+                        error = (
+                            sync_result.get("data", {}).get("error") or "Unknown error"
+                        )
+                        request_id = sync_result.get("data", {}).get("id", "unknown")
+                        raise RuntimeError(
+                            f"Prediction failed (task_id: {request_id}): {error}"
+                        )
                     data = sync_result.get("data", {})
                     return {"outputs": data.get("outputs", [])}
 
