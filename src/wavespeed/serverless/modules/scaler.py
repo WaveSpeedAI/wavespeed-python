@@ -62,6 +62,12 @@ class JobScaler:
         if concurrency_modifier := config.get("concurrency_modifier"):
             self.concurrency_modifier = concurrency_modifier
 
+        # Apply concurrency modifier immediately
+        old_concurrency = self.current_concurrency
+        self.current_concurrency = self.concurrency_modifier(self.current_concurrency)
+        if self.current_concurrency != old_concurrency:
+            self.jobs_queue = asyncio.Queue(maxsize=self.current_concurrency)
+
         # Allow overriding jobs_fetcher and handler in local test mode
         if not IS_LOCAL_TEST:
             return
@@ -207,19 +213,32 @@ class JobScaler:
         tasks: list[asyncio.Task[None]] = []
 
         while self.is_alive() or not self.jobs_queue.empty():
+            num_tasks = len(tasks)
+
             while len(tasks) < self.current_concurrency and not self.jobs_queue.empty():
                 job = await self.jobs_queue.get()
                 task = asyncio.create_task(self.handle_job(session, job))
                 tasks.append(task)
 
-            if tasks:
-                log.info(f"Jobs in progress: {len(tasks)}")
-
-                done, pending = await asyncio.wait(
-                    tasks, return_when=asyncio.FIRST_COMPLETED
+            if len(tasks) > num_tasks:
+                log.info(
+                    f"Started {len(tasks) - num_tasks} new job(s), "
+                    f"total jobs in progress: {len(tasks)}"
                 )
 
+            if tasks:
+                done, pending = await asyncio.wait(
+                    tasks, timeout=0.1, return_when=asyncio.FIRST_COMPLETED
+                )
+
+                num_tasks = len(tasks)
                 tasks = [t for t in tasks if t not in done]
+
+                if len(tasks) < num_tasks:
+                    log.info(
+                        f"Completed {num_tasks - len(tasks)} job(s), "
+                        f"total jobs in progress: {len(tasks)}"
+                    )
 
             await asyncio.sleep(0)
 
