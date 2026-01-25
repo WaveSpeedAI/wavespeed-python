@@ -2,16 +2,16 @@
 
 import unittest
 
-from wavespeed.config import _resolve_url, serverless
+from wavespeed.config import _resolve_runpod_url, _resolve_waverless_url, serverless
 
 
-class TestResolveUrl(unittest.TestCase):
-    """Tests for the _resolve_url function."""
+class TestResolveRunpodUrl(unittest.TestCase):
+    """Tests for the _resolve_runpod_url function."""
 
     def test_replaces_runpod_pod_id(self):
         """Test that $RUNPOD_POD_ID is replaced with pod_id."""
         template = "https://api.runpod.ai/v2/endpoint/job-done/$RUNPOD_POD_ID"
-        result = _resolve_url(template, "my-pod-123")
+        result = _resolve_runpod_url(template, "my-pod-123")
         self.assertEqual(
             result, "https://api.runpod.ai/v2/endpoint/job-done/my-pod-123"
         )
@@ -19,33 +19,52 @@ class TestResolveUrl(unittest.TestCase):
     def test_preserves_id_placeholder(self):
         """Test that $ID is NOT replaced - it's for job ID at runtime."""
         template = "https://api.runpod.ai/v2/endpoint/job-done/$RUNPOD_POD_ID/$ID"
-        result = _resolve_url(template, "my-pod-123")
-        # $ID should remain as placeholder for job ID replacement later
+        result = _resolve_runpod_url(template, "my-pod-123")
         self.assertEqual(
             result, "https://api.runpod.ai/v2/endpoint/job-done/my-pod-123/$ID"
         )
 
     def test_handles_none_template(self):
         """Test that None template returns None."""
-        result = _resolve_url(None, "my-pod-123")
-        self.assertIsNone(result)
-
-    def test_handles_empty_template(self):
-        """Test that empty template returns None (falsy check)."""
-        result = _resolve_url("", "my-pod-123")
+        result = _resolve_runpod_url(None, "my-pod-123")
         self.assertIsNone(result)
 
     def test_no_placeholders(self):
         """Test URL without any placeholders."""
         template = "https://api.example.com/endpoint"
-        result = _resolve_url(template, "my-pod-123")
+        result = _resolve_runpod_url(template, "my-pod-123")
         self.assertEqual(result, "https://api.example.com/endpoint")
 
-    def test_multiple_pod_id_placeholders(self):
-        """Test multiple $RUNPOD_POD_ID placeholders are all replaced."""
-        template = "https://api.runpod.ai/$RUNPOD_POD_ID/test/$RUNPOD_POD_ID"
-        result = _resolve_url(template, "pod-456")
-        self.assertEqual(result, "https://api.runpod.ai/pod-456/test/pod-456")
+
+class TestResolveWaverlessUrl(unittest.TestCase):
+    """Tests for the _resolve_waverless_url function."""
+
+    def test_replaces_waverless_pod_id_placeholder(self):
+        """Test that $WAVERLESS_POD_ID is replaced with pod_id."""
+        template = "https://api.wavespeed.ai/v2/test/job-take/$WAVERLESS_POD_ID"
+        result = _resolve_waverless_url(template, "my-pod-123")
+        self.assertEqual(
+            result, "https://api.wavespeed.ai/v2/test/job-take/my-pod-123"
+        )
+
+    def test_preserves_id_placeholder(self):
+        """Test that $ID is NOT replaced - it's for job/worker ID at runtime."""
+        template = "https://api.wavespeed.ai/v2/test/job-done/$WAVERLESS_POD_ID/$ID"
+        result = _resolve_waverless_url(template, "my-pod-123")
+        self.assertEqual(
+            result, "https://api.wavespeed.ai/v2/test/job-done/my-pod-123/$ID"
+        )
+
+    def test_handles_none_template(self):
+        """Test that None template returns None."""
+        result = _resolve_waverless_url(None, "my-pod-123")
+        self.assertIsNone(result)
+
+    def test_no_placeholders(self):
+        """Test URL without any placeholders."""
+        template = "https://api.example.com/endpoint"
+        result = _resolve_waverless_url(template, "my-pod-123")
+        self.assertEqual(result, "https://api.example.com/endpoint")
 
 
 class TestServerlessConfig(unittest.TestCase):

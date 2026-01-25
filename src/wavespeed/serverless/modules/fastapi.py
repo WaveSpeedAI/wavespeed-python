@@ -220,6 +220,15 @@ class WorkerAPI:
             tags=["Status"],
         )
 
+        # Health check endpoint
+        router.add_api_route(
+            "/health",
+            lambda: {"status": "ok"},
+            methods=["GET"],
+            summary="Health check",
+            tags=["Status"],
+        )
+
         self.app.include_router(router)
 
     def start(
