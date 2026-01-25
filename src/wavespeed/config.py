@@ -83,22 +83,20 @@ def _detect_serverless_env() -> Optional[str]:
         The serverless environment type ("runpod", "waverless") or None
         if not running in a known serverless environment.
     """
-    # Check for RunPod environment
-    if os.environ.get("RUNPOD_POD_ID"):
-        return "runpod"
 
     # Check for native Waverless environment
     if os.environ.get("WAVERLESS_POD_ID"):
         return "waverless"
 
+    # Check for RunPod environment
+    if os.environ.get("RUNPOD_POD_ID"):
+        return "runpod"
+
     return None
 
 
-def _resolve_url(url_template: Optional[str], pod_id: str) -> Optional[str]:
-    """Replace pod ID placeholder in URL template.
-
-    Note: Only $RUNPOD_POD_ID is replaced here. The $ID placeholder is
-    replaced later at runtime with the actual job ID in http._handle_result.
+def _resolve_runpod_url(url_template: Optional[str], pod_id: str) -> Optional[str]:
+    """Replace pod ID placeholder in RunPod URL template.
 
     Args:
         url_template: URL template with $RUNPOD_POD_ID placeholder.
@@ -112,6 +110,21 @@ def _resolve_url(url_template: Optional[str], pod_id: str) -> Optional[str]:
     return url_template.replace("$RUNPOD_POD_ID", pod_id)
 
 
+def _resolve_waverless_url(url_template: Optional[str], pod_id: str) -> Optional[str]:
+    """Replace pod ID placeholder in Waverless URL template.
+
+    Args:
+        url_template: URL template with $WAVERLESS_POD_ID placeholder.
+        pod_id: The worker/pod ID to substitute.
+
+    Returns:
+        URL with $WAVERLESS_POD_ID placeholder replaced, or None if template is None.
+    """
+    if not url_template:
+        return None
+    return url_template.replace("$WAVERLESS_POD_ID", pod_id)
+
+
 def _load_runpod_serverless_config() -> None:
     """Load RunPod environment variables into serverless config."""
     # Worker identification
@@ -123,15 +136,23 @@ def _load_runpod_serverless_config() -> None:
     serverless.webhook_post_stream = os.environ.get("RUNPOD_WEBHOOK_POST_STREAM")
     serverless.webhook_ping = os.environ.get("RUNPOD_WEBHOOK_PING")
 
-    # Resolved API endpoints (with pod_id substituted)
-    serverless.job_get_url = _resolve_url(serverless.webhook_get_job, serverless.pod_id)
-    serverless.job_done_url = _resolve_url(
+    # Resolved API endpoints (with $RUNPOD_POD_ID substituted)
+    job_get_url = _resolve_runpod_url(serverless.webhook_get_job, serverless.pod_id)
+    # job_get_url also needs $ID replaced with worker ID (like runpod-python)
+    if job_get_url:
+        job_get_url = job_get_url.replace("$ID", serverless.pod_id)
+    serverless.job_get_url = job_get_url
+
+    # job_done_url keeps $ID for runtime replacement with job_id
+    serverless.job_done_url = _resolve_runpod_url(
         serverless.webhook_post_output, serverless.pod_id
     )
-    serverless.job_stream_url = _resolve_url(
+    serverless.job_stream_url = _resolve_runpod_url(
         serverless.webhook_post_stream, serverless.pod_id
     )
-    serverless.ping_url = _resolve_url(serverless.webhook_ping, serverless.pod_id)
+    serverless.ping_url = _resolve_runpod_url(
+        serverless.webhook_ping, serverless.pod_id
+    )
 
     # Authentication
     serverless.api_key = os.environ.get("RUNPOD_AI_API_KEY")
@@ -172,15 +193,23 @@ def _load_waverless_serverless_config() -> None:
     serverless.webhook_post_stream = os.environ.get("WAVERLESS_WEBHOOK_POST_STREAM")
     serverless.webhook_ping = os.environ.get("WAVERLESS_WEBHOOK_PING")
 
-    # Resolved API endpoints (with pod_id substituted)
-    serverless.job_get_url = _resolve_url(serverless.webhook_get_job, serverless.pod_id)
-    serverless.job_done_url = _resolve_url(
+    # Resolved API endpoints (with $WAVERLESS_POD_ID substituted)
+    job_get_url = _resolve_waverless_url(serverless.webhook_get_job, serverless.pod_id)
+    # job_get_url also needs $ID replaced with worker ID (like runpod)
+    if job_get_url:
+        job_get_url = job_get_url.replace("$ID", serverless.pod_id)
+    serverless.job_get_url = job_get_url
+
+    # job_done_url keeps $ID for runtime replacement with job_id
+    serverless.job_done_url = _resolve_waverless_url(
         serverless.webhook_post_output, serverless.pod_id
     )
-    serverless.job_stream_url = _resolve_url(
+    serverless.job_stream_url = _resolve_waverless_url(
         serverless.webhook_post_stream, serverless.pod_id
     )
-    serverless.ping_url = _resolve_url(serverless.webhook_ping, serverless.pod_id)
+    serverless.ping_url = _resolve_waverless_url(
+        serverless.webhook_ping, serverless.pod_id
+    )
 
     # Authentication
     serverless.api_key = os.environ.get("WAVERLESS_API_KEY")
