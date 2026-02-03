@@ -56,8 +56,8 @@ def _parse_args() -> argparse.Namespace:
         "--waverless_api_host",
         "--rp_api_host",
         type=str,
-        default="localhost",
-        help="API server host (default: localhost)",
+        default="0.0.0.0",
+        help="API server host (default: 0.0.0.0)",
     )
     parser.add_argument(
         "--waverless_api_port",
@@ -160,6 +160,17 @@ def start(config: Dict[str, Any]) -> None:
             port=args.waverless_api_port,
         )
     else:
-        # Standard worker mode
+        # Standard worker mode with health check server
         log.info("Starting serverless worker...")
-        run_worker(config)
+        from .modules.health import HealthServer
+
+        health_server = HealthServer(
+            host=args.waverless_api_host,
+            port=args.waverless_api_port,
+        )
+        health_server.start()
+
+        try:
+            run_worker(config)
+        finally:
+            health_server.stop()
