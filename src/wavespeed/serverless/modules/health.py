@@ -45,7 +45,9 @@ class HealthServer:
         """Start the health server in a background thread."""
         try:
             self._server = HTTPServer((self.host, self.port), HealthHandler)
-            self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
+            self._thread = threading.Thread(
+                target=self._server.serve_forever, daemon=True
+            )
             self._thread.start()
             log.info(f"Health server started at http://{self.host}:{self.port}/health")
         except Exception as e:
