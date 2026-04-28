@@ -183,11 +183,6 @@ class Client:
                         f"Failed to submit prediction after {self.max_connection_retries + 1} attempts"
                     ) from e
 
-        # Should not reach here, but guard against it
-        raise last_error or RuntimeError(
-            f"Failed to submit prediction after {self.max_connection_retries + 1} attempts"
-        )
-
     def _get_result(
         self, request_id: str, timeout: float | None = None
     ) -> dict[str, Any]:
@@ -264,12 +259,6 @@ class Client:
                         f"Failed to get result for task {request_id} "
                         f"after {self.max_connection_retries + 1} attempts"
                     ) from e
-
-        # Should not reach here, but guard against it
-        raise last_error or RuntimeError(
-            f"Failed to get result for task {request_id} "
-            f"after {self.max_connection_retries + 1} attempts"
-        )
 
     def _wait(
         self,
