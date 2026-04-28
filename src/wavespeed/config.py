@@ -84,7 +84,6 @@ def _detect_serverless_env() -> Optional[str]:
         The serverless environment type ("runpod", "waverless") or None
         if not running in a known serverless environment.
     """
-
     # Check for native Waverless environment
     if os.environ.get("WAVERLESS_ENDPOINT_ID"):
         return "waverless"
