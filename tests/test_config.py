@@ -43,9 +43,7 @@ class TestResolveWaverlessUrl(unittest.TestCase):
         """Test that $WAVERLESS_POD_ID is replaced with pod_id."""
         template = "https://api.wavespeed.ai/v2/test/job-take/$WAVERLESS_POD_ID"
         result = _resolve_waverless_url(template, "my-pod-123")
-        self.assertEqual(
-            result, "https://api.wavespeed.ai/v2/test/job-take/my-pod-123"
-        )
+        self.assertEqual(result, "https://api.wavespeed.ai/v2/test/job-take/my-pod-123")
 
     def test_preserves_id_placeholder(self):
         """Test that $ID is NOT replaced - it's for job/worker ID at runtime."""
