@@ -51,7 +51,9 @@ def run(
         input: Input parameters for the model.
         timeout: Maximum time to wait for completion (None = no timeout).
         poll_interval: Interval between status checks in seconds.
-        enable_sync_mode: If True, use synchronous mode (single request).
+        enable_sync_mode: If True, use synchronous mode (best-effort single
+            request). If the server-side sync wait times out, an error is
+            raised with the task ID so the result can be queried later.
         max_retries: Maximum retries for this request (overrides default setting).
 
     Returns:

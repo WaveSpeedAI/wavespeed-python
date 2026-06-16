@@ -28,7 +28,7 @@ class Client:
         client = Client(api_key="your-api-key")
         output = client.run("wavespeed-ai/z-image/turbo", {"prompt": "Cat"})
 
-        # With sync mode (single request, waits for result)
+        # With sync mode (best-effort single request, waits for result)
         output = client.run("wavespeed-ai/z-image/turbo", {"prompt": "Cat"}, enable_sync_mode=True)
 
         # With retry
@@ -334,6 +334,25 @@ class Client:
 
         return False
 
+    @staticmethod
+    def _format_sync_mode_error(data: dict[str, Any]) -> str:
+        """Build an actionable error for a non-completed sync-mode response."""
+        request_id = data.get("id") or "unknown"
+        error = data.get("error") or "Unknown error"
+        urls = data.get("urls") or {}
+        result_url = urls.get("get") if isinstance(urls, dict) else None
+
+        is_sync_timeout = data.get("code") == 5004 or (
+            data.get("status") == "processing" and "Sync mode timed out" in error
+        )
+        if is_sync_timeout:
+            message = f"Sync mode timed out (task_id: {request_id}): {error}"
+            if result_url and result_url not in message:
+                message += f" Query the result later at: {result_url}"
+            return message
+
+        return f"Prediction failed (task_id: {request_id}): {error}"
+
     def run(
         self,
         model: str,
@@ -351,9 +370,9 @@ class Client:
             input: Input parameters for the model.
             timeout: Maximum time to wait for completion (None = no timeout).
             poll_interval: Interval between status checks in seconds.
-            enable_sync_mode: If True, use synchronous mode (single request).
-                If sync mode fails with a gateway timeout (HTTP 502/504),
-                the SDK automatically falls back to async mode (submit + poll).
+            enable_sync_mode: If True, use synchronous mode (best-effort single
+                request). If the server-side sync wait times out, the SDK raises
+                an error with the task ID so the result can be queried later.
             max_retries: Maximum task-level retries (overrides client setting).
 
         Returns:
@@ -366,28 +385,19 @@ class Client:
         """
         task_retries = max_retries if max_retries is not None else self.max_retries
         last_error = None
-        # Track whether we should fall back from sync to async mode.
-        # This happens when sync mode hits a gateway timeout (502/504) after
-        # exhausting connection-level retries — the gateway cannot hold the
-        # connection long enough, but the backend may still be healthy.
-        use_sync = enable_sync_mode
 
         for attempt in range(task_retries + 1):
             try:
                 request_id, sync_result = self._submit(
-                    model, input, enable_sync_mode=use_sync, timeout=timeout
+                    model, input, enable_sync_mode=enable_sync_mode, timeout=timeout
                 )
 
-                if use_sync:
+                if enable_sync_mode:
                     # In sync mode, extract outputs from the result
                     status = sync_result.get("data", {}).get("status")
                     if status != "completed":
-                        error = (
-                            sync_result.get("data", {}).get("error") or "Unknown error"
-                        )
-                        request_id = sync_result.get("data", {}).get("id", "unknown")
                         raise RuntimeError(
-                            f"Prediction failed (task_id: {request_id}): {error}"
+                            self._format_sync_mode_error(sync_result.get("data", {}))
                         )
                     data = sync_result.get("data", {})
                     return {"outputs": data.get("outputs", [])}
@@ -396,17 +406,6 @@ class Client:
 
             except Exception as e:
                 last_error = e
-
-                # Sync-to-async fallback: if sync mode got a gateway timeout
-                # (502/504) after all connection retries, switch to async mode
-                # and retry immediately without consuming a task-level retry.
-                if use_sync and self._is_gateway_timeout(e):
-                    print(
-                        "Sync mode hit gateway timeout, "
-                        "falling back to async mode (submit + poll)..."
-                    )
-                    use_sync = False
-                    continue
 
                 is_retryable = self._is_retryable_error(e)
 
@@ -422,21 +421,6 @@ class Client:
         if last_error:
             raise last_error
         raise RuntimeError(f"All {task_retries + 1} attempts failed")
-
-    @staticmethod
-    def _is_gateway_timeout(error: Exception) -> bool:
-        """Check if an error is a gateway timeout (HTTP 502 or 504).
-
-        Args:
-            error: The exception to check.
-
-        Returns:
-            True if the error indicates a gateway timeout.
-        """
-        if isinstance(error, RuntimeError):
-            error_str = str(error)
-            return "HTTP 502" in error_str or "HTTP 504" in error_str
-        return False
 
     def upload(self, file: str | BinaryIO, *, timeout: float | None = None) -> str:
         """Upload a file to WaveSpeed.

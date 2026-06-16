@@ -171,6 +171,43 @@ class TestClient(unittest.TestCase):
             client.run("wavespeed-ai/z-image/turbo", {"prompt": "test"}, timeout=10)
         self.assertIn("timed out", str(ctx.exception))
 
+    @patch("wavespeed.api.client.requests.get")
+    @patch("wavespeed.api.client.requests.post")
+    def test_run_sync_mode_timeout_raises_without_fallback(self, mock_post, mock_get):
+        """Test sync-mode timeout keeps the task queryable without async fallback."""
+        result_url = "https://api.wavespeed.ai/api/v3/predictions/req-timeout/result"
+        mock_post_response = MagicMock()
+        mock_post_response.status_code = 200
+        mock_post_response.json.return_value = {
+            "data": {
+                "id": "req-timeout",
+                "status": "processing",
+                "code": 5004,
+                "error": (
+                    "Sync mode timed out after 90 seconds. The prediction is "
+                    "still processing asynchronously."
+                ),
+                "urls": {"get": result_url},
+            }
+        }
+        mock_post.return_value = mock_post_response
+
+        client = Client(api_key="test-key")
+        with self.assertRaises(RuntimeError) as ctx:
+            client.run(
+                "wavespeed-ai/z-image/turbo",
+                {"prompt": "test"},
+                enable_sync_mode=True,
+                max_retries=1,
+            )
+
+        error = str(ctx.exception)
+        self.assertIn("Sync mode timed out", error)
+        self.assertIn("req-timeout", error)
+        self.assertIn(result_url, error)
+        mock_post.assert_called_once()
+        mock_get.assert_not_called()
+
 
 class TestModuleLevelRun(unittest.TestCase):
     """Tests for the module-level run() function."""
