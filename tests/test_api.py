@@ -175,9 +175,7 @@ class TestClient(unittest.TestCase):
     @patch("wavespeed.api.client.requests.post")
     def test_run_sync_mode_timeout_raises_without_fallback(self, mock_post, mock_get):
         """Test sync-mode timeout keeps the task queryable without async fallback."""
-        result_url = (
-            "https://api.wavespeed.ai/api/v3/predictions/req-timeout/result"
-        )
+        result_url = "https://api.wavespeed.ai/api/v3/predictions/req-timeout/result"
         mock_post_response = MagicMock()
         mock_post_response.status_code = 200
         mock_post_response.json.return_value = {
