@@ -64,13 +64,15 @@ output = wavespeed.run(
     {"prompt": "Cat"},
     timeout=36000.0,       # Max wait time in seconds (default: 36000.0)
     poll_interval=1.0,     # Status check interval (default: 1.0)
-    enable_sync_mode=False, # Single request mode, no polling (default: False)
+    enable_sync_mode=False, # Best-effort sync result attempt (default: False)
 )
 ```
 
 ### Sync Mode
 
-Use `enable_sync_mode=True` for a single request that waits for the result (no polling).
+Use `enable_sync_mode=True` to ask the API to wait for the result in the initial
+request. If the server-side sync wait times out, the SDK raises an error with
+the task ID/result URL; the task continues processing and can be queried later.
 
 > **Note:** Not all models support sync mode. Check the model documentation for availability.
 
