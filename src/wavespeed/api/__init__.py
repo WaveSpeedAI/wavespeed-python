@@ -47,7 +47,7 @@ def run(
     """Run a model and wait for the output.
 
     Args:
-        model: Model identifier (e.g., "wavespeed-ai/flux-dev").
+        model: Model identifier (e.g., "wavespeed-ai/z-image/turbo").
         input: Input parameters for the model.
         timeout: Maximum time to wait for completion (None = no timeout).
         poll_interval: Interval between status checks in seconds.
@@ -78,11 +78,12 @@ def run(
             enable_sync_mode=True
         )
 
-        # With retry
+        # Keep replacement task attempts disabled unless your workload accepts
+        # a new task after a confirmed terminal failure.
         output = wavespeed.run(
             "wavespeed-ai/z-image/turbo",
             {"prompt": "A cat"},
-            max_retries=3
+            max_retries=0
         )
     """
     return _get_default_client().run(

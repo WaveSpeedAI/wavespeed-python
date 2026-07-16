@@ -93,8 +93,8 @@ from wavespeed import Client
 
 client = Client(
     api_key="your-api-key",
-    max_retries=0,            # Task-level retries (default: 0)
-    max_connection_retries=5, # HTTP connection retries (default: 5)
+    max_retries=0,            # Replacement task attempts (default: 0)
+    max_connection_retries=5, # Result-query GET retries; POST is never retried
     retry_interval=1.0,       # Base delay between retries in seconds (default: 1.0)
 )
 ```

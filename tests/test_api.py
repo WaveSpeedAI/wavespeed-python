@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 
+import requests
 import wavespeed
 from wavespeed.api import Client
 
@@ -82,6 +83,33 @@ class TestClient(unittest.TestCase):
         with self.assertRaises(RuntimeError) as ctx:
             client._submit("wavespeed-ai/z-image/turbo", {"prompt": "test"})
         self.assertIn("HTTP 500", str(ctx.exception))
+        mock_post.assert_called_once()
+
+    @patch("wavespeed.api.client.requests.post")
+    def test_submit_connection_error_is_not_retried(self, mock_post):
+        """An ambiguous disconnect must not create a duplicate task."""
+        mock_post.side_effect = requests.exceptions.ConnectionError("disconnected")
+
+        client = Client(api_key="test-key", max_connection_retries=5)
+        with self.assertRaises(RuntimeError) as ctx:
+            client._submit("wavespeed-ai/z-image/turbo", {"prompt": "test"})
+
+        self.assertIn("will not retry the POST", str(ctx.exception))
+        mock_post.assert_called_once()
+
+    @patch("wavespeed.api.client.requests.post")
+    def test_task_retries_do_not_repeat_failed_submission(self, mock_post):
+        """Task retry configuration must not override POST safety."""
+        mock_response = MagicMock()
+        mock_response.status_code = 500
+        mock_response.text = "Internal Server Error"
+        mock_post.return_value = mock_response
+
+        client = Client(api_key="test-key", max_retries=3)
+        with self.assertRaises(RuntimeError):
+            client.run("wavespeed-ai/z-image/turbo", {"prompt": "test"})
+
+        mock_post.assert_called_once()
 
     @patch("wavespeed.api.client.requests.get")
     def test_get_result_success(self, mock_get):

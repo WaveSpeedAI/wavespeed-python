@@ -31,7 +31,8 @@ class api:
     # Maximum number of retries for the entire operation (task-level retries)
     max_retries: int = 0
 
-    # Maximum number of retries for individual HTTP requests (connection errors, timeouts)
+    # Maximum retries for idempotent result-query GET requests. Submission
+    # POSTs are intentionally sent at most once.
     max_connection_retries: int = 5
 
     # Base interval between retries in seconds (actual delay = retry_interval * attempt)

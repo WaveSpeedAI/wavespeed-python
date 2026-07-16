@@ -13,6 +13,10 @@ from wavespeed.config import api as api_config
 _RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 
 
+class _SubmissionError(RuntimeError):
+    """A task submission failed and must not be retried automatically."""
+
+
 class Client:
     """WaveSpeed API client.
 
@@ -21,7 +25,7 @@ class Client:
         base_url: Base URL for the API. If not provided, uses wavespeed.config.api.base_url.
         connection_timeout: Timeout for HTTP requests in seconds.
         max_retries: Maximum number of retries for the entire operation.
-        max_connection_retries: Maximum retries for individual HTTP requests.
+        max_connection_retries: Maximum retries for result-query GET requests.
         retry_interval: Base interval between retries in seconds.
 
     Example:
@@ -31,8 +35,9 @@ class Client:
         # With sync mode (best-effort single request, waits for result)
         output = client.run("wavespeed-ai/z-image/turbo", {"prompt": "Cat"}, enable_sync_mode=True)
 
-        # With retry
-        output = client.run("wavespeed-ai/z-image/turbo", {"prompt": "Cat"}, max_retries=3)
+        # Task-level replacement attempts are opt-in; submission POSTs are
+        # always sent at most once.
+        output = client.run("wavespeed-ai/z-image/turbo", {"prompt": "Cat"}, max_retries=1)
     """
 
     def __init__(
@@ -121,67 +126,34 @@ class Client:
         )
         timeouts = (connect_timeout, request_timeout)
 
-        last_error: Exception | None = None
+        try:
+            response = requests.post(
+                url, json=body, headers=self._get_headers(), timeout=timeouts
+            )
+        except (
+            requests.exceptions.ConnectionError,
+            requests.exceptions.Timeout,
+        ) as e:
+            raise _SubmissionError(
+                "Prediction submission did not return a response. The task may already "
+                "have been created, so the SDK will not retry the POST automatically."
+            ) from e
 
-        for retry in range(self.max_connection_retries + 1):
-            try:
-                response = requests.post(
-                    url, json=body, headers=self._get_headers(), timeout=timeouts
-                )
+        if response.status_code != 200:
+            raise _SubmissionError(
+                f"Failed to submit prediction: HTTP {response.status_code}: {response.text}"
+            )
 
-                if response.status_code != 200:
-                    # Retry on transient server errors (5xx) and rate limiting (429)
-                    if self._is_retryable_status(response.status_code):
-                        last_error = RuntimeError(
-                            f"Failed to submit prediction: HTTP {response.status_code}: "
-                            f"{response.text}"
-                        )
-                        if retry < self.max_connection_retries:
-                            delay = self.retry_interval * (retry + 1)
-                            print(
-                                f"Server error (HTTP {response.status_code}) on attempt "
-                                f"{retry + 1}/{self.max_connection_retries + 1}, "
-                                f"retrying in {delay} seconds..."
-                            )
-                            time.sleep(delay)
-                            continue
-                        raise last_error
+        result = response.json()
 
-                    # Non-retryable HTTP errors (4xx etc.) fail immediately
-                    raise RuntimeError(
-                        f"Failed to submit prediction: HTTP {response.status_code}: "
-                        f"{response.text}"
-                    )
+        if enable_sync_mode:
+            return None, result
 
-                result = response.json()
+        request_id = result.get("data", {}).get("id")
+        if not request_id:
+            raise _SubmissionError(f"No request ID in response: {result}")
 
-                if enable_sync_mode:
-                    return None, result
-
-                request_id = result.get("data", {}).get("id")
-                if not request_id:
-                    raise RuntimeError(f"No request ID in response: {result}")
-
-                return request_id, None
-
-            except (
-                requests.exceptions.ConnectionError,
-                requests.exceptions.Timeout,
-            ) as e:
-                last_error = e
-                print(
-                    f"Connection error on attempt {retry + 1}/{self.max_connection_retries + 1}:"
-                )
-                traceback.print_exc()
-
-                if retry < self.max_connection_retries:
-                    delay = self.retry_interval * (retry + 1)
-                    print(f"Retrying in {delay} seconds...")
-                    time.sleep(delay)
-                else:
-                    raise RuntimeError(
-                        f"Failed to submit prediction after {self.max_connection_retries + 1} attempts"
-                    ) from e
+        return request_id, None
 
     def _get_result(
         self, request_id: str, timeout: float | None = None
@@ -315,7 +287,12 @@ class Client:
         Returns:
             True if the error is retryable.
         """
-        # Always retry timeout and connection errors
+        # Submission errors are ambiguous: the server may already have created
+        # the task, so never turn them into another POST automatically.
+        if isinstance(error, _SubmissionError):
+            return False
+
+        # Retry timeout and connection errors from result-query GETs.
         if isinstance(
             error,
             (
@@ -366,7 +343,7 @@ class Client:
         """Run a model and wait for the output.
 
         Args:
-            model: Model identifier (e.g., "wavespeed-ai/flux-dev").
+            model: Model identifier (e.g., "wavespeed-ai/z-image/turbo").
             input: Input parameters for the model.
             timeout: Maximum time to wait for completion (None = no timeout).
             poll_interval: Interval between status checks in seconds.
