@@ -10,22 +10,23 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 DIRECTORY=
 DOCKERFILE=Dockerfile
 VARIANT=
-LOCAL=0
+PUSH=0
 
 # Parse command line args
-while getopts ":hd:f:v:l" opt; do
+while getopts ":hd:f:v:pl" opt; do
   case $opt in
     d) DIRECTORY="$OPTARG" ;;
     f) DOCKERFILE="$OPTARG" ;;
     v) VARIANT="$OPTARG" ;;
-    l) LOCAL=1 ;;
-    h) echo "Usage: $0 -d <directory> [-f dockerfile] [-v variant] [-l (local only)]"
+    p) PUSH=1 ;;
+    l) PUSH=0 ;; # kept for compatibility; local-only is now the default
+    h) echo "Usage: $0 -d <directory> [-f dockerfile] [-v variant] [-p (push)]"
        echo ""
        echo "Options:"
        echo "  -d  Directory name under images/ (required)"
        echo "  -f  Dockerfile name (default: Dockerfile)"
        echo "  -v  Variant suffix for tag"
-       echo "  -l  Local build only, skip push"
+       echo "  -p  Push to Docker Hub after build (default: local build only)"
        exit 0 ;;
     :) echo "Option -$OPTARG requires an argument" >&2
        exit 1 ;;
@@ -36,7 +37,7 @@ done
 
 if [ -z "$DIRECTORY" ]; then
   echo "Error: Missing directory argument (-d)" >&2
-  echo "Usage: $0 -d <directory> [-f dockerfile] [-v variant] [-l]" >&2
+  echo "Usage: $0 -d <directory> [-f dockerfile] [-v variant] [-p]" >&2
   exit 1
 fi
 
@@ -59,6 +60,8 @@ else
 fi
 
 FULL_TAG="${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${TAG}"
+WAVESPEED_VERSION="$(git -C "$REPO_ROOT" describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')"
+WAVESPEED_VERSION="${WAVESPEED_VERSION:-0.0.0}"
 DOCKERFILE_PATH="${SCRIPT_DIR}/${DIRECTORY}/${DOCKERFILE}"
 PLATFORM="linux/amd64"
 
@@ -80,12 +83,14 @@ if [ -z "$VARIANT" ]; then
     --platform "$PLATFORM" \
     -t "$FULL_TAG" \
     -f "$DOCKERFILE_PATH" \
+    --build-arg WAVESPEED_VERSION="$WAVESPEED_VERSION" \
     "$REPO_ROOT"
 else
   docker buildx build \
     --platform "$PLATFORM" \
     -t "$FULL_TAG" \
     -f "$DOCKERFILE_PATH" \
+    --build-arg WAVESPEED_VERSION="$WAVESPEED_VERSION" \
     --build-arg VARIANT="$VARIANT" \
     "$REPO_ROOT"
 fi
@@ -94,14 +99,14 @@ echo "" >&2
 echo "Docker image built: $FULL_TAG" >&2
 
 # Push the Docker image to Docker Hub
-if [ $LOCAL -eq 0 ]; then
+if [ $PUSH -eq 1 ]; then
   echo "" >&2
   echo "=== Pushing to Docker Hub ===" >&2
   docker push "$FULL_TAG"
   echo "Pushed: $FULL_TAG" >&2
 else
   echo "" >&2
-  echo "Skipping push (local mode)" >&2
+  echo "Skipping push (default; pass -p to push)" >&2
 fi
 
 # Output the full tag (useful for scripting)

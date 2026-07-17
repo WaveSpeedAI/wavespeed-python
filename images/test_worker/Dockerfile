@@ -19,8 +19,11 @@ COPY ./$THIS_DIR/requirements.txt /opt/work_dir/requirements.txt
 RUN $PY -m pip install --no-build-isolation --no-cache-dir -r /opt/work_dir/requirements.txt
 
 # Install wavespeed SDK from local source
+# .git is excluded from the build context, so setuptools_scm needs the version passed in
 COPY . /opt/wavespeed-python
-RUN $PY -m pip install --no-build-isolation --no-cache-dir -e /opt/wavespeed-python
+ARG WAVESPEED_VERSION=0.0.0
+RUN SETUPTOOLS_SCM_PRETEND_VERSION_FOR_WAVESPEED="$WAVESPEED_VERSION" \
+    $PY -m pip install --no-build-isolation --no-cache-dir -e /opt/wavespeed-python
 
 COPY ./$THIS_DIR/handler.py /opt/work_dir/handler.py
 
