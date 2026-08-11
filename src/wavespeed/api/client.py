@@ -1,5 +1,9 @@
 """WaveSpeed API client implementation."""
 
+from __future__ import annotations
+
+import io
+import mimetypes
 import os
 import time
 import traceback
@@ -424,41 +428,75 @@ class Client:
                 "or pass api_key to Client()."
             )
 
-        url = f"{self.base_url}/api/v3/media/upload/binary"
-        headers = {"Authorization": f"Bearer {self.api_key}"}
+        ticket_url = f"{self.base_url}/api/v3/media/uploads"
+        headers = self._get_headers()
         timeout = timeout or api_config.timeout
         request_timeout = (min(self.connection_timeout, timeout), timeout)
 
+        close_stream = False
         if isinstance(file, str):
             if not os.path.exists(file):
                 raise FileNotFoundError(f"File not found: {file}")
-            with open(file, "rb") as f:
-                files = {"file": (os.path.basename(file), f)}
-                response = requests.post(
-                    url, headers=headers, files=files, timeout=request_timeout
-                )
+            filename = os.path.basename(file)
+            size = os.path.getsize(file)
+            stream = open(file, "rb")  # noqa: SIM115 - closed in the method's finally block
+            close_stream = True
         else:
             filename = getattr(file, "name", "upload")
             if isinstance(filename, str) and os.path.sep in filename:
                 filename = os.path.basename(filename)
-            files = {"file": (filename, file)}
+            stream = file
+            try:
+                start = stream.tell()
+                stream.seek(0, os.SEEK_END)
+                size = stream.tell() - start
+                stream.seek(start)
+            except (AttributeError, OSError, io.UnsupportedOperation):
+                data = stream.read(200 * 1024 * 1024 + 1)
+                stream = io.BytesIO(data)
+                size = len(data)
+
+        content_type = mimetypes.guess_type(str(filename))[0]
+        payload: dict[str, Any] = {"filename": str(filename), "size": size}
+        if content_type:
+            payload["content_type"] = content_type
+
+        try:
             response = requests.post(
-                url, headers=headers, files=files, timeout=request_timeout
+                ticket_url, headers=headers, json=payload, timeout=request_timeout
             )
+            if response.status_code != 200:
+                raise RuntimeError(
+                    f"Failed to create upload: HTTP {response.status_code}: {response.text}"
+                )
 
-        if response.status_code != 200:
-            raise RuntimeError(
-                f"Failed to upload file: HTTP {response.status_code}: {response.text}"
+            result = response.json()
+            if result.get("code") != 200:
+                raise RuntimeError(
+                    f"Upload failed: {result.get('message', 'Unknown error')}"
+                )
+
+            ticket = result.get("data", {})
+            instruction = ticket.get("upload", {})
+            if instruction.get("method", "").upper() != "PUT" or not instruction.get("url"):
+                raise RuntimeError("Upload failed: invalid upload instruction")
+
+            upload_response = requests.put(
+                instruction["url"],
+                headers=instruction.get("headers", {}),
+                data=stream,
+                timeout=request_timeout,
             )
+            if not 200 <= upload_response.status_code < 300:
+                raise RuntimeError(
+                    f"Failed to upload file: HTTP {upload_response.status_code}: "
+                    f"{upload_response.text}"
+                )
 
-        result = response.json()
-        if result.get("code") != 200:
-            raise RuntimeError(
-                f"Upload failed: {result.get('message', 'Unknown error')}"
-            )
-
-        download_url = result.get("data", {}).get("download_url")
-        if not download_url:
-            raise RuntimeError("Upload failed: no download_url in response")
-
-        return download_url
+            download_url = ticket.get("download_url")
+            if not download_url:
+                raise RuntimeError("Upload failed: no download_url in response")
+            return download_url
+        finally:
+            if close_stream:
+                stream.close()

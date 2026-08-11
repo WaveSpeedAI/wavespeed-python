@@ -7,6 +7,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 import requests
+
 import wavespeed
 from wavespeed.api import Client
 
@@ -278,8 +279,9 @@ class TestModuleLevelRun(unittest.TestCase):
 class TestUpload(unittest.TestCase):
     """Tests for the upload functionality."""
 
+    @patch("wavespeed.api.client.requests.put")
     @patch("wavespeed.api.client.requests.post")
-    def test_upload_file_path(self, mock_post):
+    def test_upload_file_path(self, mock_post, mock_put):
         """Test uploading a file by path."""
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -291,9 +293,15 @@ class TestUpload(unittest.TestCase):
                 "download_url": "https://example.com/uploaded.png",
                 "filename": "test.png",
                 "size": 1024,
+                "upload": {
+                    "method": "PUT",
+                    "url": "https://storage.example.com/upload",
+                    "headers": {"Content-Type": "image/png"},
+                },
             },
         }
         mock_post.return_value = mock_response
+        mock_put.return_value.status_code = 200
 
         # Create a temporary file
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
@@ -306,11 +314,17 @@ class TestUpload(unittest.TestCase):
 
             self.assertEqual(url, "https://example.com/uploaded.png")
             mock_post.assert_called_once()
+            ticket_payload = mock_post.call_args.kwargs["json"]
+            self.assertEqual(ticket_payload["size"], len(b"fake image data"))
+            self.assertEqual(ticket_payload["content_type"], "image/png")
+            mock_put.assert_called_once()
+            self.assertNotIn("Authorization", mock_put.call_args.kwargs["headers"])
         finally:
             os.unlink(temp_path)
 
+    @patch("wavespeed.api.client.requests.put")
     @patch("wavespeed.api.client.requests.post")
-    def test_upload_file_object(self, mock_post):
+    def test_upload_file_object(self, mock_post, mock_put):
         """Test uploading a file-like object."""
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -322,9 +336,15 @@ class TestUpload(unittest.TestCase):
                 "download_url": "https://example.com/uploaded.png",
                 "filename": "upload",
                 "size": 1024,
+                "upload": {
+                    "method": "PUT",
+                    "url": "https://storage.example.com/upload",
+                    "headers": {"If-None-Match": "*"},
+                },
             },
         }
         mock_post.return_value = mock_response
+        mock_put.return_value.status_code = 200
 
         client = Client(api_key="test-key")
         file_obj = io.BytesIO(b"fake image data")
@@ -332,6 +352,8 @@ class TestUpload(unittest.TestCase):
 
         self.assertEqual(url, "https://example.com/uploaded.png")
         mock_post.assert_called_once()
+        self.assertEqual(mock_post.call_args.kwargs["json"]["size"], len(b"fake image data"))
+        mock_put.assert_called_once()
 
     def test_upload_file_not_found(self):
         """Test uploading a non-existent file."""
