@@ -352,7 +352,9 @@ class TestUpload(unittest.TestCase):
 
         self.assertEqual(url, "https://example.com/uploaded.png")
         mock_post.assert_called_once()
-        self.assertEqual(mock_post.call_args.kwargs["json"]["size"], len(b"fake image data"))
+        self.assertEqual(
+            mock_post.call_args.kwargs["json"]["size"], len(b"fake image data")
+        )
         mock_put.assert_called_once()
 
     def test_upload_file_not_found(self):

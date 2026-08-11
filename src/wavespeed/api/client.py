@@ -439,7 +439,9 @@ class Client:
                 raise FileNotFoundError(f"File not found: {file}")
             filename = os.path.basename(file)
             size = os.path.getsize(file)
-            stream = open(file, "rb")  # noqa: SIM115 - closed in the method's finally block
+            stream = open(
+                file, "rb"
+            )  # noqa: SIM115 - closed in the method's finally block
             close_stream = True
         else:
             filename = getattr(file, "name", "upload")
@@ -478,7 +480,9 @@ class Client:
 
             ticket = result.get("data", {})
             instruction = ticket.get("upload", {})
-            if instruction.get("method", "").upper() != "PUT" or not instruction.get("url"):
+            if instruction.get("method", "").upper() != "PUT" or not instruction.get(
+                "url"
+            ):
                 raise RuntimeError("Upload failed: invalid upload instruction")
 
             upload_response = requests.put(
