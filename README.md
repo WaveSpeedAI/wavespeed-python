@@ -1,6 +1,9 @@
 <div align="center">
   <a href="https://wavespeed.ai" target="_blank" rel="noopener noreferrer">
-    <img src="https://raw.githubusercontent.com/WaveSpeedAI/waverless/main/docs/images/wavespeed-dark-logo.png" alt="WaveSpeedAI logo" width="200"/>
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="assets/wavespeed-logo-dark.svg">
+      <img src="assets/wavespeed-logo-light.svg" alt="WaveSpeed" width="342" height="48"/>
+    </picture>
   </a>
 
   <h1>WaveSpeedAI Python SDK</h1>
