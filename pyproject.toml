@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "wavespeed"
-description = "WaveSpeedAI Python Client — Official Python SDK for WaveSpeedAI inference platform"
+description = "WaveSpeed Python Client — Official Python SDK for the WaveSpeed inference platform"
 readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}

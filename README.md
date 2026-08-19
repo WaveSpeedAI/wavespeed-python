@@ -6,10 +6,10 @@
     </picture>
   </a>
 
-  <h1>WaveSpeedAI Python SDK</h1>
+  <h1>WaveSpeed Python SDK</h1>
 
   <p>
-    <strong>Official Python SDK for the WaveSpeedAI inference platform</strong>
+    <strong>Official Python SDK for the WaveSpeed inference platform</strong>
   </p>
 
   <p>
