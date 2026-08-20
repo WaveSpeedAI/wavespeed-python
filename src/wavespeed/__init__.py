@@ -1,9 +1,9 @@
 """
 WaveSpeedAI Python Client — Official Python SDK for WaveSpeedAI inference platform.
 
-This library provides a clean, unified, and high-performance API and serverless
-integration layer for your applications. Effortlessly connect to all
-WaveSpeedAI models and inference services with zero infrastructure overhead.
+This library provides a clean, unified, and high-performance API client for
+your applications. Effortlessly connect to all WaveSpeedAI models and
+inference services with zero infrastructure overhead.
 
 Example usage:
     import wavespeed
@@ -21,7 +21,7 @@ except ImportError:
     # Version file doesn't exist yet (e.g., during initial development)
     __version__ = "0.0.0.dev0"
 
-# Import config to auto-detect and load serverless environment
+# Import config so `wavespeed.config` is available after `import wavespeed`
 from wavespeed import config  # noqa: F401
 
 # Import API client

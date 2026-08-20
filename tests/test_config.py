@@ -2,80 +2,60 @@
 
 import unittest
 
-from wavespeed.config import _resolve_runpod_url, _resolve_waverless_url, serverless
+import wavespeed.config as config_module
+from wavespeed.config import api
 
 
-class TestResolveRunpodUrl(unittest.TestCase):
-    """Tests for the _resolve_runpod_url function."""
+class TestApiConfig(unittest.TestCase):
+    """Tests for the api config namespace."""
 
-    def test_replaces_runpod_pod_id(self):
-        """Test that $RUNPOD_POD_ID is replaced with pod_id."""
-        template = "https://api.runpod.ai/v2/endpoint/job-done/$RUNPOD_POD_ID"
-        result = _resolve_runpod_url(template, "my-pod-123")
-        self.assertEqual(
-            result, "https://api.runpod.ai/v2/endpoint/job-done/my-pod-123"
-        )
+    def test_api_has_expected_attributes(self):
+        """Test that api config exposes every documented setting."""
+        for name in (
+            "api_key",
+            "base_url",
+            "connection_timeout",
+            "timeout",
+            "max_retries",
+            "max_connection_retries",
+            "retry_interval",
+        ):
+            self.assertTrue(hasattr(api, name), f"api.{name} is missing")
 
-    def test_preserves_id_placeholder(self):
-        """Test that $ID is NOT replaced - it's for job ID at runtime."""
-        template = "https://api.runpod.ai/v2/endpoint/job-done/$RUNPOD_POD_ID/$ID"
-        result = _resolve_runpod_url(template, "my-pod-123")
-        self.assertEqual(
-            result, "https://api.runpod.ai/v2/endpoint/job-done/my-pod-123/$ID"
-        )
+    def test_defaults(self):
+        """Test the shipped default values."""
+        self.assertEqual(api.base_url, "https://api.wavespeed.ai")
+        self.assertEqual(api.connection_timeout, 10.0)
+        self.assertEqual(api.timeout, 36000.0)
+        self.assertEqual(api.max_retries, 0)
+        self.assertEqual(api.max_connection_retries, 5)
+        self.assertEqual(api.retry_interval, 1.0)
 
-    def test_handles_none_template(self):
-        """Test that None template returns None."""
-        result = _resolve_runpod_url(None, "my-pod-123")
-        self.assertIsNone(result)
+    def test_patch_restores_previous_value(self):
+        """Test that config.patch() is scoped to the context manager."""
+        original = api.base_url
+        with config_module.patch("api.base_url", "https://example.invalid"):
+            self.assertEqual(api.base_url, "https://example.invalid")
+        self.assertEqual(api.base_url, original)
 
-    def test_no_placeholders(self):
-        """Test URL without any placeholders."""
-        template = "https://api.example.com/endpoint"
-        result = _resolve_runpod_url(template, "my-pod-123")
-        self.assertEqual(result, "https://api.example.com/endpoint")
-
-
-class TestResolveWaverlessUrl(unittest.TestCase):
-    """Tests for the _resolve_waverless_url function."""
-
-    def test_replaces_waverless_pod_id_placeholder(self):
-        """Test that $WAVERLESS_POD_ID is replaced with pod_id."""
-        template = "https://api.wavespeed.ai/v2/test/job-take/$WAVERLESS_POD_ID"
-        result = _resolve_waverless_url(template, "my-pod-123")
-        self.assertEqual(result, "https://api.wavespeed.ai/v2/test/job-take/my-pod-123")
-
-    def test_preserves_id_placeholder(self):
-        """Test that $ID is NOT replaced - it's for job/worker ID at runtime."""
-        template = "https://api.wavespeed.ai/v2/test/job-done/$WAVERLESS_POD_ID/$ID"
-        result = _resolve_waverless_url(template, "my-pod-123")
-        self.assertEqual(
-            result, "https://api.wavespeed.ai/v2/test/job-done/my-pod-123/$ID"
-        )
-
-    def test_handles_none_template(self):
-        """Test that None template returns None."""
-        result = _resolve_waverless_url(None, "my-pod-123")
-        self.assertIsNone(result)
-
-    def test_no_placeholders(self):
-        """Test URL without any placeholders."""
-        template = "https://api.example.com/endpoint"
-        result = _resolve_waverless_url(template, "my-pod-123")
-        self.assertEqual(result, "https://api.example.com/endpoint")
+    def test_unknown_attribute_raises(self):
+        """Test that unknown config keys are rejected."""
+        with self.assertRaises(AttributeError):
+            config_module.definitely_not_a_setting
 
 
-class TestServerlessConfig(unittest.TestCase):
-    """Tests for serverless config loading."""
+class TestServerlessRemoved(unittest.TestCase):
+    """The serverless worker was removed in v2.0.0."""
 
-    def test_serverless_has_expected_attributes(self):
-        """Test that serverless config has all expected attributes."""
-        self.assertTrue(hasattr(serverless, "pod_id"))
-        self.assertTrue(hasattr(serverless, "api_key"))
-        self.assertTrue(hasattr(serverless, "job_get_url"))
-        self.assertTrue(hasattr(serverless, "job_done_url"))
-        self.assertTrue(hasattr(serverless, "job_stream_url"))
-        self.assertTrue(hasattr(serverless, "ping_url"))
+    def test_serverless_config_is_gone(self):
+        """Test that the serverless config namespace no longer exists."""
+        with self.assertRaises(AttributeError):
+            config_module.serverless
+
+    def test_serverless_package_is_gone(self):
+        """Test that the serverless package is no longer importable."""
+        with self.assertRaises(ImportError):
+            import wavespeed.serverless  # noqa: F401
 
 
 if __name__ == "__main__":
