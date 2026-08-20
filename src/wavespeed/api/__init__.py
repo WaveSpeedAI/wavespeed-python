@@ -17,6 +17,8 @@ Example usage:
     print(url)  # URL of the uploaded file
 """
 
+from __future__ import annotations
+
 from typing import BinaryIO
 
 from wavespeed.api.client import Client
