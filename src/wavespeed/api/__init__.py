@@ -21,7 +21,7 @@ from typing import BinaryIO
 
 from wavespeed.api.client import Client
 
-__all__ = ["Client", "run", "run_no_throw", "upload"]
+__all__ = ["Client", "get_result", "run", "run_no_throw", "upload"]
 
 # Default client instance
 _default_client: Client | None = None
@@ -94,6 +94,28 @@ def run(
         enable_sync_mode=enable_sync_mode,
         max_retries=max_retries,
     )
+
+
+def get_result(
+    request_id: str,
+    *,
+    timeout: float | None = None,
+    api_key: str | None = None,
+) -> dict:
+    """Fetch a prediction's current state by id.
+
+    Recovers a task whose local wait timed out — it keeps running server-side.
+
+    Args:
+        request_id: The prediction request ID.
+        timeout: Request timeout in seconds.
+        api_key: Override the API key for this call.
+
+    Returns:
+        Full API response, including ``data.status`` and ``data.outputs``.
+    """
+    client = Client(api_key=api_key) if api_key else _get_default_client()
+    return client.get_result(request_id, timeout=timeout)
 
 
 def run_no_throw(

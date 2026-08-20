@@ -195,6 +195,26 @@ class Client:
 
         return request_id, None
 
+    def get_result(
+        self, request_id: str, timeout: float | None = None
+    ) -> dict[str, Any]:
+        """Fetch a prediction's current state by id.
+
+        Useful for recovering a task whose local wait timed out: the task keeps
+        running server-side, and this returns whatever state it has reached.
+
+        Args:
+            request_id: The prediction request ID.
+            timeout: Request timeout in seconds.
+
+        Returns:
+            Full API response, including ``data.status`` and ``data.outputs``.
+
+        Raises:
+            RuntimeError: If fetching the result fails after retries.
+        """
+        return self._get_result(request_id, timeout=timeout)
+
     def _get_result(
         self, request_id: str, timeout: float | None = None
     ) -> dict[str, Any]:

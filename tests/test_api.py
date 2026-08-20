@@ -678,3 +678,30 @@ class TestRealAPI(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_get_result_public_method_delegates(monkeypatch):
+    """Client.get_result is public API and mirrors the internal fetch."""
+    client = Client(api_key="test-key")
+    seen = {}
+
+    def fake_get_result(request_id, timeout=None):
+        seen["request_id"] = request_id
+        seen["timeout"] = timeout
+        return {
+            "code": 200,
+            "data": {"id": request_id, "status": "completed", "outputs": ["u"]},
+        }
+
+    monkeypatch.setattr(client, "_get_result", fake_get_result)
+    out = client.get_result("pred-123", timeout=5.0)
+    assert seen == {"request_id": "pred-123", "timeout": 5.0}
+    assert out["data"]["status"] == "completed"
+
+
+def test_module_level_get_result_is_exported():
+    """wavespeed.get_result exists so callers need not touch private methods."""
+    import wavespeed
+
+    assert callable(wavespeed.get_result)
+    assert "get_result" in wavespeed.__all__
