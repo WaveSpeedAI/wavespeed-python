@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import mimetypes
 import os
+import platform
 import time
 import traceback
 from typing import Any, BinaryIO
@@ -12,6 +13,27 @@ from typing import Any, BinaryIO
 import requests
 
 from wavespeed.config import api as api_config
+
+try:
+    from wavespeed._version import __version__
+except ImportError:  # pragma: no cover - version file generated at build time
+    __version__ = "0.0.0.dev0"
+
+# Default channel-attribution client name (see X-Client-Name header)
+_DEFAULT_CLIENT_NAME = "wavespeed-python"
+
+
+def _get_client_os() -> str:
+    """Get the client OS name using the desktop client's vocabulary.
+
+    Returns:
+        Lowercase OS identifier ("darwin", "linux", "win32", ...).
+    """
+    system = platform.system().lower()
+    if system == "windows":
+        return "win32"
+    return system or "unknown"
+
 
 # HTTP status codes that are safe to retry
 _RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
@@ -31,6 +53,9 @@ class Client:
         max_retries: Maximum number of retries for the entire operation.
         max_connection_retries: Maximum retries for result-query GET requests.
         retry_interval: Base interval between retries in seconds.
+        client_name: Channel-attribution name sent as the X-Client-Name header.
+            The WAVESPEED_CLIENT_NAME environment variable takes priority,
+            then this parameter, then the default "wavespeed-python".
 
     Example:
         client = Client(api_key="your-api-key")
@@ -52,6 +77,7 @@ class Client:
         max_retries: int | None = None,
         max_connection_retries: int | None = None,
         retry_interval: float | None = None,
+        client_name: str | None = None,
     ) -> None:
         """Initialize the client."""
         self.api_key = api_key or api_config.api_key
@@ -67,6 +93,12 @@ class Client:
         )
         self.retry_interval = (
             retry_interval if retry_interval is not None else api_config.retry_interval
+        )
+        # Channel attribution: env var > explicit parameter > default
+        self.client_name = (
+            os.environ.get("WAVESPEED_CLIENT_NAME")
+            or client_name
+            or _DEFAULT_CLIENT_NAME
         )
 
     @staticmethod
@@ -91,6 +123,9 @@ class Client:
         return {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.api_key}",
+            "X-Client-Name": self.client_name,
+            "X-Client-Version": __version__,
+            "X-Client-OS": _get_client_os(),
         }
 
     def _submit(

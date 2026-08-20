@@ -53,6 +53,43 @@ class TestClient(unittest.TestCase):
         self.assertEqual(headers["Authorization"], "Bearer test-key")
         self.assertEqual(headers["Content-Type"], "application/json")
 
+    def test_get_headers_includes_client_attribution(self):
+        """Test that _get_headers includes channel-attribution headers."""
+        client = Client(api_key="test-key")
+        headers = client._get_headers()
+        self.assertEqual(headers["X-Client-Name"], "wavespeed-python")
+        self.assertEqual(headers["X-Client-Version"], wavespeed.__version__)
+        self.assertIn(headers["X-Client-OS"], {"linux", "darwin", "win32"})
+
+    def test_client_name_explicit_parameter(self):
+        """Test that an explicit client_name overrides the default."""
+        client = Client(api_key="test-key", client_name="my-integration")
+        headers = client._get_headers()
+        self.assertEqual(headers["X-Client-Name"], "my-integration")
+
+    @patch.dict(os.environ, {"WAVESPEED_CLIENT_NAME": "env-channel"})
+    def test_client_name_env_overrides_parameter(self):
+        """Test that WAVESPEED_CLIENT_NAME takes priority over the parameter."""
+        client = Client(api_key="test-key", client_name="my-integration")
+        headers = client._get_headers()
+        self.assertEqual(headers["X-Client-Name"], "env-channel")
+
+    @patch("wavespeed.api.client.requests.post")
+    def test_submit_sends_attribution_headers(self, mock_post):
+        """Test that prediction submission sends attribution headers."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"data": {"id": "req-123"}}
+        mock_post.return_value = mock_response
+
+        client = Client(api_key="test-key")
+        client._submit("wavespeed-ai/z-image/turbo", {"prompt": "test"})
+
+        headers = mock_post.call_args.kwargs["headers"]
+        self.assertEqual(headers["X-Client-Name"], "wavespeed-python")
+        self.assertEqual(headers["X-Client-Version"], wavespeed.__version__)
+        self.assertIn(headers["X-Client-OS"], {"linux", "darwin", "win32"})
+
     @patch("wavespeed.api.client.requests.post")
     def test_submit_success(self, mock_post):
         """Test successful prediction submission."""
