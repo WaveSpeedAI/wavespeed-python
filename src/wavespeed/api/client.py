@@ -6,6 +6,7 @@ import io
 import mimetypes
 import os
 import platform
+import re
 import time
 import traceback
 from typing import Any, BinaryIO
@@ -27,11 +28,11 @@ def _get_client_os() -> str:
     """Get the client OS name using the desktop client's vocabulary.
 
     Returns:
-        Lowercase OS identifier ("darwin", "linux", "win32", ...).
+        Lowercase OS identifier ("darwin", "linux", "windows", ...).
     """
     system = platform.system().lower()
     if system == "windows":
-        return "win32"
+        return "windows"
     return system or "unknown"
 
 
@@ -309,10 +310,10 @@ class Client:
             if status == "completed":
                 return {"outputs": data.get("outputs", [])}
 
-            if status == "failed":
+            if status in ("failed", "cancelled", "timeout"):
                 error = data.get("error") or "Unknown error"
                 raise RuntimeError(
-                    f"Prediction failed (task_id: {request_id}): {error}"
+                    f"Prediction {status} (task_id: {request_id}): {error}"
                 )
 
             time.sleep(poll_interval)
@@ -437,6 +438,121 @@ class Client:
         if last_error:
             raise last_error
         raise RuntimeError(f"All {task_retries + 1} attempts failed")
+
+    @staticmethod
+    def _task_id_from_error(error: Exception) -> str:
+        """Extract a task ID from an error message, mirroring the JS SDK."""
+        match = re.search(r"task_id:\s*([^)]+)", str(error))
+        return match.group(1).strip() if match else "unknown"
+
+    def run_no_throw(
+        self,
+        model: str,
+        input: dict[str, Any] | None = None,
+        *,
+        timeout: float | None = None,
+        poll_interval: float = 1.0,
+        enable_sync_mode: bool = False,
+        max_retries: int | None = None,
+    ) -> dict[str, Any]:
+        """Run a model and return a structured result instead of raising.
+
+        Mirrors the JavaScript SDK's runNoThrow: failures (including
+        server-side sync-mode timeouts) are reported in the returned dict
+        rather than raised, and the task ID is extracted whenever available
+        so the result can be queried later.
+
+        Args:
+            model: Model identifier (e.g., "wavespeed-ai/z-image/turbo").
+            input: Input parameters for the model.
+            timeout: Maximum time to wait for completion (None = no timeout).
+            poll_interval: Interval between status checks in seconds.
+            enable_sync_mode: If True, use synchronous mode (best-effort
+                single request).
+            max_retries: Maximum task-level retries (overrides client setting).
+
+        Returns:
+            Dict with keys:
+                status: "completed", "failed", or "processing" (the latter for
+                    server-side sync-mode timeouts where the task is still
+                    running).
+                outputs: List of model outputs, or None if not completed.
+                task_id: The task ID when known, otherwise "unknown".
+                error: Error message string, or None on success.
+
+        Example:
+            result = client.run_no_throw("wavespeed-ai/z-image/turbo", {"prompt": "Cat"})
+            if result["outputs"] is not None:
+                print("Success:", result["outputs"], result["task_id"])
+            else:
+                print("Failed:", result["error"], result["task_id"])
+        """
+        task_retries = max_retries if max_retries is not None else self.max_retries
+
+        for attempt in range(task_retries + 1):
+            try:
+                request_id, sync_result = self._submit(
+                    model, input, enable_sync_mode=enable_sync_mode, timeout=timeout
+                )
+
+                if enable_sync_mode:
+                    data = (sync_result or {}).get("data", {})
+                    status = data.get("status")
+                    task_id = data.get("id") or "unknown"
+
+                    if status != "completed":
+                        error_msg = self._format_sync_mode_error(data)
+                        is_sync_timeout = data.get("code") == 5004 or (
+                            status == "processing"
+                            and "Sync mode timed out" in (data.get("error") or "")
+                        )
+                        return {
+                            "status": "processing" if is_sync_timeout else "failed",
+                            "outputs": None,
+                            "task_id": task_id,
+                            "error": error_msg,
+                        }
+
+                    return {
+                        "status": "completed",
+                        "outputs": data.get("outputs", []),
+                        "task_id": task_id,
+                        "error": None,
+                    }
+
+                result = self._wait(request_id, timeout, poll_interval)
+                return {
+                    "status": "completed",
+                    "outputs": result.get("outputs", []),
+                    "task_id": request_id,
+                    "error": None,
+                }
+
+            except Exception as e:  # noqa: BLE001 - by design: never raises
+                if self._is_retryable_error(e) and attempt < task_retries:
+                    print(f"Task attempt {attempt + 1}/{task_retries + 1} failed: {e}")
+                    delay = self.retry_interval * (attempt + 1)
+                    print(f"Retrying in {delay} seconds...")
+                    time.sleep(delay)
+                    continue
+
+                # Extract the task ID from the error message like the JS SDK
+                task_id = self._task_id_from_error(e)
+                is_sync_timeout = "sync mode timed out" in str(e).lower()
+                return {
+                    "status": "processing" if is_sync_timeout else "failed",
+                    "outputs": None,
+                    "task_id": task_id,
+                    "error": str(e),
+                }
+
+        # Should not reach here, but just in case
+        return {
+            "status": "failed",
+            "outputs": None,
+            "task_id": "unknown",
+            "error": f"All {task_retries + 1} attempts failed",
+        }
 
     def upload(self, file: str | BinaryIO, *, timeout: float | None = None) -> str:
         """Upload a file to WaveSpeed.

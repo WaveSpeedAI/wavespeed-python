@@ -263,6 +263,7 @@ curl -X POST http://localhost:8000/run \
 | Variable | Description |
 |----------|-------------|
 | `WAVESPEED_API_KEY` | WaveSpeed API key |
+| `WAVESPEED_CLIENT_NAME` | Channel-attribution name sent as the `X-Client-Name` header (overrides the `client_name` parameter; defaults to `wavespeed-python`) |
 
 ### Serverless Worker
 

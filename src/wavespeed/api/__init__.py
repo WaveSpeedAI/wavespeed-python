@@ -13,15 +13,15 @@ Example usage:
     print(output["outputs"][0])  # First output URL
 
     # Upload a file
-    result = wavespeed.upload("/path/to/image.png")
-    print(result["download_url"])
+    url = wavespeed.upload("/path/to/image.png")
+    print(url)  # URL of the uploaded file
 """
 
 from typing import BinaryIO
 
 from wavespeed.api.client import Client
 
-__all__ = ["Client", "run", "upload"]
+__all__ = ["Client", "run", "run_no_throw", "upload"]
 
 # Default client instance
 _default_client: Client | None = None
@@ -87,6 +87,54 @@ def run(
         )
     """
     return _get_default_client().run(
+        model,
+        input,
+        timeout=timeout,
+        poll_interval=poll_interval,
+        enable_sync_mode=enable_sync_mode,
+        max_retries=max_retries,
+    )
+
+
+def run_no_throw(
+    model: str,
+    input: dict | None = None,
+    *,
+    timeout: float | None = None,
+    poll_interval: float = 1.0,
+    enable_sync_mode: bool = False,
+    max_retries: int | None = None,
+) -> dict:
+    """Run a model and return a structured result instead of raising.
+
+    Mirrors the JavaScript SDK's runNoThrow: failures (including server-side
+    sync-mode timeouts) are reported in the returned dict rather than raised,
+    and the task ID is extracted whenever available so the result can be
+    queried later.
+
+    Args:
+        model: Model identifier (e.g., "wavespeed-ai/z-image/turbo").
+        input: Input parameters for the model.
+        timeout: Maximum time to wait for completion (None = no timeout).
+        poll_interval: Interval between status checks in seconds.
+        enable_sync_mode: If True, use synchronous mode (best-effort single
+            request).
+        max_retries: Maximum retries for this request (overrides default setting).
+
+    Returns:
+        Dict with keys "status", "outputs", "task_id", and "error".
+
+    Example:
+        result = wavespeed.run_no_throw(
+            "wavespeed-ai/z-image/turbo",
+            {"prompt": "A cat"}
+        )
+        if result["outputs"] is not None:
+            print(result["outputs"][0])
+        else:
+            print("Failed:", result["error"], result["task_id"])
+    """
+    return _get_default_client().run_no_throw(
         model,
         input,
         timeout=timeout,

@@ -59,7 +59,7 @@ class TestClient(unittest.TestCase):
         headers = client._get_headers()
         self.assertEqual(headers["X-Client-Name"], "wavespeed-python")
         self.assertEqual(headers["X-Client-Version"], wavespeed.__version__)
-        self.assertIn(headers["X-Client-OS"], {"linux", "darwin", "win32"})
+        self.assertIn(headers["X-Client-OS"], {"linux", "darwin", "windows"})
 
     def test_client_name_explicit_parameter(self):
         """Test that an explicit client_name overrides the default."""
@@ -88,7 +88,7 @@ class TestClient(unittest.TestCase):
         headers = mock_post.call_args.kwargs["headers"]
         self.assertEqual(headers["X-Client-Name"], "wavespeed-python")
         self.assertEqual(headers["X-Client-Version"], wavespeed.__version__)
-        self.assertIn(headers["X-Client-OS"], {"linux", "darwin", "win32"})
+        self.assertIn(headers["X-Client-OS"], {"linux", "darwin", "windows"})
 
     @patch("wavespeed.api.client.requests.post")
     def test_submit_success(self, mock_post):
@@ -311,6 +311,183 @@ class TestModuleLevelRun(unittest.TestCase):
 
         result = wavespeed.run("wavespeed-ai/z-image/turbo", {"prompt": "test"})
         self.assertEqual(result["outputs"], ["https://example.com/out.png"])
+
+
+class TestTerminalStatuses(unittest.TestCase):
+    """Tests for cancelled/timeout terminal statuses in the wait loop."""
+
+    def _run_with_status(self, status):
+        with patch("wavespeed.api.client.requests.post") as mock_post, patch(
+            "wavespeed.api.client.requests.get"
+        ) as mock_get:
+            mock_post_response = MagicMock()
+            mock_post_response.status_code = 200
+            mock_post_response.json.return_value = {"data": {"id": "req-123"}}
+            mock_post.return_value = mock_post_response
+
+            mock_get_response = MagicMock()
+            mock_get_response.status_code = 200
+            mock_get_response.json.return_value = {
+                "data": {"status": status, "error": f"Task {status} by server"}
+            }
+            mock_get.return_value = mock_get_response
+
+            client = Client(api_key="test-key")
+            client.run("wavespeed-ai/z-image/turbo", {"prompt": "test"})
+
+    def test_cancelled_is_terminal(self):
+        """Test that a cancelled status raises with the API's error text."""
+        with self.assertRaises(RuntimeError) as ctx:
+            self._run_with_status("cancelled")
+        self.assertIn("Task cancelled by server", str(ctx.exception))
+        self.assertIn("req-123", str(ctx.exception))
+
+    def test_timeout_is_terminal(self):
+        """Test that a timeout status raises with the API's error text."""
+        with self.assertRaises(RuntimeError) as ctx:
+            self._run_with_status("timeout")
+        self.assertIn("Task timeout by server", str(ctx.exception))
+        self.assertIn("req-123", str(ctx.exception))
+
+
+class TestRunNoThrow(unittest.TestCase):
+    """Tests for Client.run_no_throw and the module-level run_no_throw."""
+
+    @patch("wavespeed.api.client.requests.get")
+    @patch("wavespeed.api.client.requests.post")
+    def test_run_no_throw_success(self, mock_post, mock_get):
+        """Test run_no_throw() returns a completed result with outputs."""
+        mock_post_response = MagicMock()
+        mock_post_response.status_code = 200
+        mock_post_response.json.return_value = {"data": {"id": "req-123"}}
+        mock_post.return_value = mock_post_response
+
+        mock_get_response = MagicMock()
+        mock_get_response.status_code = 200
+        mock_get_response.json.return_value = {
+            "data": {"status": "completed", "outputs": ["https://example.com/out.png"]}
+        }
+        mock_get.return_value = mock_get_response
+
+        client = Client(api_key="test-key")
+        result = client.run_no_throw("wavespeed-ai/z-image/turbo", {"prompt": "test"})
+
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(result["outputs"], ["https://example.com/out.png"])
+        self.assertEqual(result["task_id"], "req-123")
+        self.assertIsNone(result["error"])
+
+    @patch("wavespeed.api.client.requests.get")
+    @patch("wavespeed.api.client.requests.post")
+    def test_run_no_throw_failure(self, mock_post, mock_get):
+        """Test run_no_throw() returns a failed result instead of raising."""
+        mock_post_response = MagicMock()
+        mock_post_response.status_code = 200
+        mock_post_response.json.return_value = {"data": {"id": "req-123"}}
+        mock_post.return_value = mock_post_response
+
+        mock_get_response = MagicMock()
+        mock_get_response.status_code = 200
+        mock_get_response.json.return_value = {
+            "data": {"status": "failed", "error": "Model error"}
+        }
+        mock_get.return_value = mock_get_response
+
+        client = Client(api_key="test-key")
+        result = client.run_no_throw("wavespeed-ai/z-image/turbo", {"prompt": "test"})
+
+        self.assertEqual(result["status"], "failed")
+        self.assertIsNone(result["outputs"])
+        self.assertEqual(result["task_id"], "req-123")
+        self.assertIn("Model error", result["error"])
+
+    @patch("wavespeed.api.client.requests.get")
+    @patch("wavespeed.api.client.requests.post")
+    def test_run_no_throw_sync_timeout_extracts_task_id(self, mock_post, mock_get):
+        """Test sync-mode timeout yields a processing result with the task ID."""
+        result_url = "https://api.wavespeed.ai/api/v3/predictions/req-timeout/result"
+        mock_post_response = MagicMock()
+        mock_post_response.status_code = 200
+        mock_post_response.json.return_value = {
+            "data": {
+                "id": "req-timeout",
+                "status": "processing",
+                "code": 5004,
+                "error": (
+                    "Sync mode timed out after 90 seconds. The prediction is "
+                    "still processing asynchronously."
+                ),
+                "urls": {"get": result_url},
+            }
+        }
+        mock_post.return_value = mock_post_response
+
+        client = Client(api_key="test-key")
+        result = client.run_no_throw(
+            "wavespeed-ai/z-image/turbo",
+            {"prompt": "test"},
+            enable_sync_mode=True,
+            max_retries=1,
+        )
+
+        self.assertEqual(result["status"], "processing")
+        self.assertIsNone(result["outputs"])
+        self.assertEqual(result["task_id"], "req-timeout")
+        self.assertIn("Sync mode timed out", result["error"])
+        self.assertIn(result_url, result["error"])
+        # No replacement POST and no async fallback GET
+        mock_post.assert_called_once()
+        mock_get.assert_not_called()
+
+    def test_run_no_throw_submission_error(self):
+        """Test run_no_throw() converts submission failures into a result."""
+        with patch("wavespeed.api.client.requests.post") as mock_post:
+            mock_post_response = MagicMock()
+            mock_post_response.status_code = 401
+            mock_post_response.text = "Unauthorized"
+            mock_post.return_value = mock_post_response
+
+            client = Client(api_key="bad-key")
+            result = client.run_no_throw(
+                "wavespeed-ai/z-image/turbo", {"prompt": "test"}
+            )
+
+        self.assertEqual(result["status"], "failed")
+        self.assertIsNone(result["outputs"])
+        self.assertEqual(result["task_id"], "unknown")
+        self.assertIn("HTTP 401", result["error"])
+
+    @patch("wavespeed.api.client.api_config")
+    @patch("wavespeed.api.client.requests.get")
+    @patch("wavespeed.api.client.requests.post")
+    def test_module_level_run_no_throw(self, mock_post, mock_get, mock_config):
+        """Test that module-level run_no_throw() uses the default client."""
+        mock_config.api_key = "config-key"
+        mock_config.base_url = "https://api.wavespeed.ai"
+        mock_config.connection_timeout = 10.0
+        mock_config.timeout = 36000.0
+        mock_config.max_retries = 0
+        mock_config.max_connection_retries = 5
+        mock_config.retry_interval = 1.0
+
+        wavespeed.api._default_client = None
+
+        mock_post_response = MagicMock()
+        mock_post_response.status_code = 200
+        mock_post_response.json.return_value = {"data": {"id": "req-123"}}
+        mock_post.return_value = mock_post_response
+
+        mock_get_response = MagicMock()
+        mock_get_response.status_code = 200
+        mock_get_response.json.return_value = {
+            "data": {"status": "completed", "outputs": ["https://example.com/out.png"]}
+        }
+        mock_get.return_value = mock_get_response
+
+        result = wavespeed.run_no_throw("wavespeed-ai/z-image/turbo", {"prompt": "x"})
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(result["outputs"], ["https://example.com/out.png"])
+        self.assertEqual(result["task_id"], "req-123")
 
 
 class TestUpload(unittest.TestCase):

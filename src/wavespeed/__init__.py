@@ -25,6 +25,6 @@ except ImportError:
 from wavespeed import config  # noqa: F401
 
 # Import API client
-from wavespeed.api import Client, run, upload
+from wavespeed.api import Client, run, run_no_throw, upload
 
-__all__ = ["__version__", "Client", "run", "upload"]
+__all__ = ["__version__", "Client", "run", "run_no_throw", "upload"]
