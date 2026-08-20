@@ -4,7 +4,7 @@ All notable changes to this project are documented here.
 
 Versions are derived from Git tags via `setuptools_scm` — see [VERSIONING.md](VERSIONING.md).
 
-## 2.0.0 — Unreleased
+## 2.0.0
 
 ### Removed — BREAKING
 
@@ -14,10 +14,6 @@ WaveSpeed no longer offers serverless as an external product, so shipping a serv
 the public SDK was misleading: it advertised a capability customers cannot buy. Everything below is
 gone as of 2.0.0 and will not be restored.
 
-- Python 3.8 and 3.9 support is now real rather than aspirational: the modules that
-  carry PEP 604 annotations import `from __future__ import annotations`, and CI runs the
-  suite on 3.8 through 3.12. Previously the package advertised 3.8/3.9 but failed to import
-  on them.
 - `wavespeed.serverless` — the entire package, including `serverless.start()`, the job scaler, the
   handler-type dispatcher, the worker HTTP layer, the FastAPI local dev server, local test mode,
   worker/job state tracking, heartbeat and progress reporting, the S3 (`boto3`) upload helpers, and
@@ -28,6 +24,16 @@ gone as of 2.0.0 and will not be restored.
   build and exercise the worker.
 
 Anyone building workers against this package should pin `wavespeed<2` and plan to migrate.
+
+### Fixed
+
+- **Python 3.8 and 3.9 support is now real rather than aspirational.** `api/__init__.py` carried a
+  module-level PEP 604 annotation (`Client | None`) with no `__future__` import, so the package
+  could not be imported on 3.8 or 3.9 despite `requires-python = ">=3.8"`. CI now runs the suite on
+  3.8 through 3.12 so the claim stays honest.
+- `typing_extensions` is now a declared dependency. It was imported at module scope but only
+  reached the environment transitively through `boto3`/`aiohttp` — removing those would have
+  produced an `ImportError` on a clean install.
 
 ### Changed
 
