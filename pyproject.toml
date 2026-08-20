@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "wavespeed"
 description = "WaveSpeed Python Client — Official Python SDK for the WaveSpeed inference platform"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [
     {name = "WaveSpeedAI", email = "support@wavespeed.ai"}
@@ -16,8 +16,6 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
