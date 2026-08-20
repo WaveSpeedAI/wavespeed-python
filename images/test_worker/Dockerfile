@@ -29,4 +29,8 @@ COPY ./$THIS_DIR/handler.py /opt/work_dir/handler.py
 
 ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libtcmalloc.so.4
 
+RUN useradd -m -u 1000 nonroot && \
+    chown -R nonroot:nonroot /opt/work_dir
+USER nonroot
+
 CMD $PY /opt/work_dir/handler.py
