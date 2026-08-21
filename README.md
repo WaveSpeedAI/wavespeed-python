@@ -138,3 +138,8 @@ python -m pytest tests/test_api.py::TestClient::test_run_success -v
 ## License
 
 MIT
+
+---
+
+**[WaveSpeed AI](https://wavespeed.ai/)** — AI image & video generation platform.
+Try it in the browser: **[Image generator](https://wavespeed.ai/image-generator)** · **[Video generator](https://wavespeed.ai/video-generator)**
