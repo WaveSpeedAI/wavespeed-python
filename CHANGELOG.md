@@ -4,6 +4,14 @@ All notable changes to this project are documented here.
 
 Versions are derived from Git tags via `setuptools_scm` — see [VERSIONING.md](VERSIONING.md).
 
+## 2.0.1
+
+### Changed
+
+- PyPI project links now point at the product rather than only at the repository. `Homepage` is
+  `https://wavespeed.ai` (it was the GitHub repo), and `Documentation` and `Changelog` entries were
+  added. No code changes — packaging metadata only.
+
 ## 2.0.0
 
 ### Removed — BREAKING

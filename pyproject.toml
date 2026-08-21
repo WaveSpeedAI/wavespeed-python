@@ -30,9 +30,11 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/WaveSpeedAI/wavespeed-python"
+Homepage = "https://wavespeed.ai"
+Documentation = "https://wavespeed.ai/docs/"
 Repository = "https://github.com/WaveSpeedAI/wavespeed-python"
 Issues = "https://github.com/WaveSpeedAI/wavespeed-python/issues"
+Changelog = "https://github.com/WaveSpeedAI/wavespeed-python/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 test = ["pytest"]
