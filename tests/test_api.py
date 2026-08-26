@@ -253,7 +253,6 @@ class TestClient(unittest.TestCase):
                     "Sync mode timed out after 90 seconds. The prediction is "
                     "still processing asynchronously."
                 ),
-                "urls": {"get": result_url},
             }
         }
         mock_post.return_value = mock_post_response
@@ -314,7 +313,7 @@ class TestModuleLevelRun(unittest.TestCase):
 
 
 class TestTerminalStatuses(unittest.TestCase):
-    """Tests for cancelled/timeout terminal statuses in the wait loop."""
+    """Tests for non-success terminal statuses in the wait loop."""
 
     def _run_with_status(self, status):
         with patch("wavespeed.api.client.requests.post") as mock_post, patch(
@@ -347,6 +346,13 @@ class TestTerminalStatuses(unittest.TestCase):
         with self.assertRaises(RuntimeError) as ctx:
             self._run_with_status("timeout")
         self.assertIn("Task timeout by server", str(ctx.exception))
+        self.assertIn("req-123", str(ctx.exception))
+
+    def test_deleted_is_terminal(self):
+        """Test that a deleted status raises with the API's error text."""
+        with self.assertRaises(RuntimeError) as ctx:
+            self._run_with_status("deleted")
+        self.assertIn("Task deleted by server", str(ctx.exception))
         self.assertIn("req-123", str(ctx.exception))
 
 
@@ -417,7 +423,6 @@ class TestRunNoThrow(unittest.TestCase):
                     "Sync mode timed out after 90 seconds. The prediction is "
                     "still processing asynchronously."
                 ),
-                "urls": {"get": result_url},
             }
         }
         mock_post.return_value = mock_post_response

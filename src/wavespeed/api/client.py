@@ -330,7 +330,7 @@ class Client:
             if status == "completed":
                 return {"outputs": data.get("outputs", [])}
 
-            if status in ("failed", "cancelled", "timeout"):
+            if status in ("failed", "cancelled", "timeout", "deleted"):
                 error = data.get("error") or "Unknown error"
                 raise RuntimeError(
                     f"Prediction {status} (task_id: {request_id}): {error}"
@@ -371,13 +371,15 @@ class Client:
 
         return False
 
-    @staticmethod
-    def _format_sync_mode_error(data: dict[str, Any]) -> str:
+    def _format_sync_mode_error(self, data: dict[str, Any]) -> str:
         """Build an actionable error for a non-completed sync-mode response."""
         request_id = data.get("id") or "unknown"
         error = data.get("error") or "Unknown error"
-        urls = data.get("urls") or {}
-        result_url = urls.get("get") if isinstance(urls, dict) else None
+        result_url = (
+            f"{self.base_url}/api/v3/predictions/{request_id}/result"
+            if request_id != "unknown"
+            else None
+        )
 
         is_sync_timeout = data.get("code") == 5004 or (
             data.get("status") == "processing" and "Sync mode timed out" in error
