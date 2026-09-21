@@ -582,6 +582,22 @@ class TestUpload(unittest.TestCase):
         with self.assertRaises(FileNotFoundError):
             client.upload("/nonexistent/path/to/file.png")
 
+    @patch("wavespeed.api.client.requests.post")
+    def test_upload_oversize_stream_raises(self, mock_post):
+        """A non-seekable stream over the limit fails before any request."""
+
+        class Pipe:
+            name = "clip.mp4"
+
+            def read(self, n):
+                return bytes(n)
+
+        client = Client(api_key="test-key")
+        with self.assertRaises(ValueError) as ctx:
+            client.upload(Pipe())
+        self.assertIn("200 MB", str(ctx.exception))
+        mock_post.assert_not_called()
+
     def test_upload_raises_without_api_key(self):
         """Test that upload raises ValueError without API key."""
         client = Client()

@@ -587,7 +587,8 @@ class Client:
             URL of the uploaded file.
 
         Raises:
-            ValueError: If API key is not configured.
+            ValueError: If API key is not configured, or a non-seekable
+                stream exceeds the 200 MB upload limit.
             FileNotFoundError: If file path does not exist.
             RuntimeError: If upload fails.
 
@@ -627,7 +628,10 @@ class Client:
                 size = stream.tell() - start
                 stream.seek(start)
             except (AttributeError, OSError, io.UnsupportedOperation):
-                data = stream.read(200 * 1024 * 1024 + 1)
+                max_size = 200 * 1024 * 1024
+                data = stream.read(max_size + 1)
+                if len(data) > max_size:
+                    raise ValueError("File size exceeds the 200 MB limit.")
                 stream = io.BytesIO(data)
                 size = len(data)
 
