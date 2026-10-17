@@ -133,6 +133,12 @@ class Client:
             "X-Client-OS": _get_client_os(),
         }
 
+    @staticmethod
+    def _default_read_timeout(per_type_default: float) -> float:
+        """Return ``api_config.read_timeout`` if set, else the per-type default."""
+        override = api_config.read_timeout
+        return override if override is not None else per_type_default
+
     def _request_timeouts(
         self, read_timeout: float | None
     ) -> tuple[float, float | None]:
@@ -157,8 +163,9 @@ class Client:
             model: Model identifier.
             input: Input parameters.
             enable_sync_mode: If True, wait for result in single request.
-            timeout: Request read timeout in seconds. Default: ``api_config.read_timeout``
-                (async) or ``api_config.timeout`` (sync mode; None = no limit).
+            timeout: Request read timeout in seconds. Default:
+                ``api_config.read_timeout_submit`` (async; ``api_config.read_timeout``
+                overrides) or ``api_config.timeout`` (sync mode; None = no limit).
 
         Returns:
             Tuple of (request_id, result). In async mode, result is None.
@@ -179,7 +186,7 @@ class Client:
             # The sync-mode POST stays open until the task finishes.
             request_timeout = api_config.timeout
         else:
-            request_timeout = api_config.read_timeout
+            request_timeout = self._default_read_timeout(api_config.read_timeout_submit)
         timeouts = self._request_timeouts(request_timeout)
 
         try:
@@ -247,7 +254,11 @@ class Client:
             RuntimeError: If fetching result fails after retries.
         """
         url = f"{self.base_url}/api/v3/predictions/{request_id}/result"
-        request_timeout = timeout if timeout is not None else api_config.read_timeout
+        request_timeout = (
+            timeout
+            if timeout is not None
+            else self._default_read_timeout(api_config.read_timeout_get)
+        )
         timeouts = self._request_timeouts(request_timeout)
 
         last_error: Exception | None = None
@@ -584,7 +595,8 @@ class Client:
         Args:
             file: File path string or file-like object to upload.
             timeout: Per-request read timeout in seconds (default:
-                ``api_config.read_timeout``). Not a total-transfer deadline.
+                ``api_config.read_timeout_upload``;
+                ``api_config.read_timeout`` overrides). Not a total-transfer deadline.
 
         Returns:
             URL of the uploaded file.
@@ -608,7 +620,9 @@ class Client:
         ticket_url = f"{self.base_url}/api/v3/media/uploads"
         headers = self._get_headers()
         # Per-request read timeout (socket inactivity), not a transfer deadline.
-        request_timeout = self._request_timeouts(timeout or api_config.read_timeout)
+        request_timeout = self._request_timeouts(
+            timeout or self._default_read_timeout(api_config.read_timeout_upload)
+        )
 
         close_stream = False
         if isinstance(file, str):

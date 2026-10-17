@@ -29,10 +29,20 @@ class api:
     # ``timeout=`` argument takes priority over this value.
     timeout: Optional[float] = None
 
-    # Read timeout in seconds for a single result GET or async submit POST.
-    # Bounds a half-open connection to one request, not the whole task. Not
-    # used by sync mode, whose submit POST stays open until the task finishes.
-    read_timeout: float = 120.0
+    # Per-request read timeout in seconds (time waiting for the server, not a
+    # total-transfer deadline). Bounds a half-open connection to one request
+    # instead of the whole task. Defaults by request type:
+    # result queries and other read-only GETs
+    read_timeout_get: float = 30.0
+    # async submit POST (a timeout here is an ambiguous outcome, so more headroom)
+    read_timeout_submit: float = 60.0
+    # upload ticket POST and file PUT
+    read_timeout_upload: float = 120.0
+    # Sync-mode submit stays open until the task finishes: no default limit.
+
+    # Optional single override applied to all of the above (not sync-mode
+    # submit). None keeps the per-type defaults.
+    read_timeout: Optional[float] = None
 
     # Maximum number of retries for the entire operation (task-level retries)
     max_retries: int = 0

@@ -71,6 +71,14 @@ output = wavespeed.run(
 )
 ```
 
+### Timeouts
+
+`timeout` is the overall wait for a task and defaults to no limit. Each HTTP
+request also has its own read timeout (time waiting for the server, not a
+total-transfer deadline): 30s for result queries, 60s for async submit and
+120s for uploads. Sync mode has no default read timeout. Set
+`wavespeed.config.api.read_timeout` to override all of these at once.
+
 ### Sync Mode
 
 Use `enable_sync_mode=True` to ask the API to wait for the result in the initial

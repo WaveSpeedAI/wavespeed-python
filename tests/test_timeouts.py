@@ -94,8 +94,21 @@ class TestTimeouts(unittest.TestCase):
         post.return_value = _submit_ok()
         get.return_value = _status("completed")
         self.client.run("m/x", {})
-        self.assertEqual(post.call_args.kwargs["timeout"], (10.0, 120.0))
-        self.assertEqual(get.call_args.kwargs["timeout"], (10.0, 120.0))
+        self.assertEqual(post.call_args.kwargs["timeout"], (10.0, 60.0))
+        self.assertEqual(get.call_args.kwargs["timeout"], (10.0, 30.0))
+
+    def test_override_applies_to_get_and_submit_not_sync(self, post, get, mock_time):
+        """Single read_timeout override covers GET and async submit, not sync."""
+        self._clock(mock_time)
+        post.return_value = _submit_ok()
+        get.return_value = _status("completed")
+        with patch("wavespeed.api.client.api_config.read_timeout", 7.0):
+            self.client.run("m/x", {})
+            self.assertEqual(post.call_args.kwargs["timeout"], (7.0, 7.0))
+            self.assertEqual(get.call_args.kwargs["timeout"], (7.0, 7.0))
+            post.return_value = _resp(200, {"data": {"status": "completed"}})
+            self.client.run("m/x", {}, enable_sync_mode=True)
+            self.assertEqual(post.call_args.kwargs["timeout"], (10.0, None))
 
     def test_sync_submit_no_read_timeout_by_default(self, post, get, mock_time):
         """Test sync submit no read timeout by default."""
@@ -159,12 +172,16 @@ class TestUploadTimeouts(unittest.TestCase):
     """upload() uses the per-request read timeout for every request."""
 
     def test_default_read_timeout(self, post, put):
-        """Ticket POST and file PUT carry (connect, 120.0)."""
+        """Ticket POST and file PUT carry (connect, 120.0); override applies."""
         post.return_value = _ticket("https://s.example.com/u")
         put.return_value = _resp(200)
         Client(api_key="k").upload(io.BytesIO(b"abc"))
         self.assertEqual(post.call_args.kwargs["timeout"], (10.0, 120.0))
         self.assertEqual(put.call_args.kwargs["timeout"], (10.0, 120.0))
+        with patch("wavespeed.api.client.api_config.read_timeout", 7.0):
+            Client(api_key="k").upload(io.BytesIO(b"abc"))
+        self.assertEqual(post.call_args.kwargs["timeout"], (7.0, 7.0))
+        self.assertEqual(put.call_args.kwargs["timeout"], (7.0, 7.0))
 
     def test_explicit_timeout(self, post, put):
         """An explicit timeout applies to both requests."""
@@ -207,7 +224,7 @@ class TestSlowProgressingPut(unittest.TestCase):
         try:
             with patch("wavespeed.api.client.requests.post") as post:
                 post.return_value = _ticket(url)
-                with patch("wavespeed.api.client.api_config.read_timeout", 2.0):
+                with patch("wavespeed.api.client.api_config.read_timeout_upload", 2.0):
                     start = time.time()
                     out = Client(api_key="k").upload(io.BytesIO(b"x" * size))
                     elapsed = time.time() - start
