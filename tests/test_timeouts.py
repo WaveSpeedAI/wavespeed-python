@@ -1,5 +1,9 @@
 """Tests for the overall-wait cap vs. per-request read timeout split."""
 
+import http.server
+import io
+import threading
+import time
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -134,3 +138,81 @@ class TestTimeouts(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def _ticket(url):
+    return _resp(
+        200,
+        {
+            "code": 200,
+            "data": {
+                "download_url": "https://example.com/f.bin",
+                "upload": {"method": "PUT", "url": url, "headers": {}},
+            },
+        },
+    )
+
+
+@patch("wavespeed.api.client.requests.put")
+@patch("wavespeed.api.client.requests.post")
+class TestUploadTimeouts(unittest.TestCase):
+    """upload() uses the per-request read timeout for every request."""
+
+    def test_default_read_timeout(self, post, put):
+        """Ticket POST and file PUT carry (connect, 120.0)."""
+        post.return_value = _ticket("https://s.example.com/u")
+        put.return_value = _resp(200)
+        Client(api_key="k").upload(io.BytesIO(b"abc"))
+        self.assertEqual(post.call_args.kwargs["timeout"], (10.0, 120.0))
+        self.assertEqual(put.call_args.kwargs["timeout"], (10.0, 120.0))
+
+    def test_explicit_timeout(self, post, put):
+        """An explicit timeout applies to both requests."""
+        post.return_value = _ticket("https://s.example.com/u")
+        put.return_value = _resp(200)
+        Client(api_key="k").upload(io.BytesIO(b"abc"), timeout=300.0)
+        self.assertEqual(post.call_args.kwargs["timeout"], (10.0, 300.0))
+        self.assertEqual(put.call_args.kwargs["timeout"], (10.0, 300.0))
+
+
+class TestSlowProgressingPut(unittest.TestCase):
+    """A slow but progressing PUT is not aborted by the read timeout."""
+
+    def test_slow_progressing_put_not_aborted(self):
+        """Body takes longer than read_timeout in total, gaps stay below it."""
+        received = []
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_PUT(self):
+                remaining = int(self.headers["Content-Length"])
+                got = 0
+                while remaining:
+                    chunk = self.rfile.read(min(65536, remaining))
+                    got += len(chunk)
+                    remaining -= len(chunk)
+                    time.sleep(0.01)  # slow consumer, keeps making progress
+                received.append(got)
+                time.sleep(0.5)  # response headers arrive late but < timeout
+                self.send_response(200)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+
+            def log_message(self, *args):
+                pass
+
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        url = f"http://127.0.0.1:{server.server_address[1]}/u"
+        size = 24 * 1024 * 1024
+        try:
+            with patch("wavespeed.api.client.requests.post") as post:
+                post.return_value = _ticket(url)
+                with patch("wavespeed.api.client.api_config.read_timeout", 2.0):
+                    start = time.time()
+                    out = Client(api_key="k").upload(io.BytesIO(b"x" * size))
+                    elapsed = time.time() - start
+        finally:
+            server.shutdown()
+        self.assertEqual(out, "https://example.com/f.bin")
+        self.assertEqual(received, [size])
+        self.assertGreater(elapsed, 2.0)  # total transfer exceeded read_timeout

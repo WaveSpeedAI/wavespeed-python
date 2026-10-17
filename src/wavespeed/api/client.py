@@ -583,7 +583,8 @@ class Client:
 
         Args:
             file: File path string or file-like object to upload.
-            timeout: Request timeout in seconds (default: no limit).
+            timeout: Per-request read timeout in seconds (default:
+                ``api_config.read_timeout``). Not a total-transfer deadline.
 
         Returns:
             URL of the uploaded file.
@@ -606,8 +607,8 @@ class Client:
 
         ticket_url = f"{self.base_url}/api/v3/media/uploads"
         headers = self._get_headers()
-        timeout = timeout or api_config.timeout
-        request_timeout = self._request_timeouts(timeout)
+        # Per-request read timeout (socket inactivity), not a transfer deadline.
+        request_timeout = self._request_timeouts(timeout or api_config.read_timeout)
 
         close_stream = False
         if isinstance(file, str):
