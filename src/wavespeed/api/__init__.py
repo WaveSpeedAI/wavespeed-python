@@ -173,7 +173,7 @@ def upload(file: str | BinaryIO, *, timeout: float | None = None) -> str:
 
     Args:
         file: File path string or file-like object to upload.
-        timeout: Total API call timeout in seconds.
+        timeout: Request timeout in seconds (default: no limit).
 
     Returns:
         URL of the uploaded file.

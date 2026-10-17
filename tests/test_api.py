@@ -378,7 +378,8 @@ class TestModuleLevelRun(unittest.TestCase):
         mock_config.api_key = "config-key"
         mock_config.base_url = "https://api.wavespeed.ai"
         mock_config.connection_timeout = 10.0
-        mock_config.timeout = 36000.0
+        mock_config.timeout = None
+        mock_config.read_timeout = 120.0
         mock_config.max_retries = 0
         mock_config.max_connection_retries = 5
         mock_config.retry_interval = 1.0
@@ -562,7 +563,8 @@ class TestRunNoThrow(unittest.TestCase):
         mock_config.api_key = "config-key"
         mock_config.base_url = "https://api.wavespeed.ai"
         mock_config.connection_timeout = 10.0
-        mock_config.timeout = 36000.0
+        mock_config.timeout = None
+        mock_config.read_timeout = 120.0
         mock_config.max_retries = 0
         mock_config.max_connection_retries = 5
         mock_config.retry_interval = 1.0

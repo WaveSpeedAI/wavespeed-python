@@ -24,8 +24,15 @@ class api:
     # Connection timeout in seconds
     connection_timeout: float = 10.0
 
-    # Total API call timeout in seconds
-    timeout: float = 36000.0
+    # Overall wait cap in seconds for a task. None (default) means no cap: the
+    # SDK waits until the task reaches a terminal status. An explicit
+    # ``timeout=`` argument takes priority over this value.
+    timeout: Optional[float] = None
+
+    # Read timeout in seconds for a single result GET or async submit POST.
+    # Bounds a half-open connection to one request, not the whole task. Not
+    # used by sync mode, whose submit POST stays open until the task finishes.
+    read_timeout: float = 120.0
 
     # Maximum number of retries for the entire operation (task-level retries)
     max_retries: int = 0

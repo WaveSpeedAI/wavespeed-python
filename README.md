@@ -65,7 +65,7 @@ output = client.run("wavespeed-ai/z-image/turbo", {"prompt": "Cat"})
 output = wavespeed.run(
     "wavespeed-ai/z-image/turbo",
     {"prompt": "Cat"},
-    timeout=36000.0,       # Max wait time in seconds (default: 36000.0)
+    timeout=None,          # Max wait time in seconds (default: None = wait until the task finishes)
     poll_interval=1.0,     # Status check interval (default: 1.0)
     enable_sync_mode=False, # Best-effort sync result attempt (default: False)
 )

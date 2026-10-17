@@ -133,6 +133,17 @@ class Client:
             "X-Client-OS": _get_client_os(),
         }
 
+    def _request_timeouts(
+        self, read_timeout: float | None
+    ) -> tuple[float, float | None]:
+        """Build a (connect, read) timeouts tuple; read None means no limit."""
+        connect_timeout = (
+            min(self.connection_timeout, read_timeout)
+            if read_timeout
+            else self.connection_timeout
+        )
+        return (connect_timeout, read_timeout)
+
     def _submit(
         self,
         model: str,
@@ -146,7 +157,8 @@ class Client:
             model: Model identifier.
             input: Input parameters.
             enable_sync_mode: If True, wait for result in single request.
-            timeout: Request timeout in seconds.
+            timeout: Request read timeout in seconds. Default: ``api_config.read_timeout``
+                (async) or ``api_config.timeout`` (sync mode; None = no limit).
 
         Returns:
             Tuple of (request_id, result). In async mode, result is None.
@@ -161,14 +173,14 @@ class Client:
         if enable_sync_mode:
             body["enable_sync_mode"] = True
 
-        request_timeout = timeout if timeout is not None else api_config.timeout
-        # Use connection timeout for connect, request_timeout for read
-        connect_timeout = (
-            min(self.connection_timeout, request_timeout)
-            if request_timeout
-            else self.connection_timeout
-        )
-        timeouts = (connect_timeout, request_timeout)
+        if timeout is not None:
+            request_timeout = timeout
+        elif enable_sync_mode:
+            # The sync-mode POST stays open until the task finishes.
+            request_timeout = api_config.timeout
+        else:
+            request_timeout = api_config.read_timeout
+        timeouts = self._request_timeouts(request_timeout)
 
         try:
             response = requests.post(
@@ -235,13 +247,8 @@ class Client:
             RuntimeError: If fetching result fails after retries.
         """
         url = f"{self.base_url}/api/v3/predictions/{request_id}/result"
-        request_timeout = timeout if timeout is not None else api_config.timeout
-        connect_timeout = (
-            min(self.connection_timeout, request_timeout)
-            if request_timeout
-            else self.connection_timeout
-        )
-        timeouts = (connect_timeout, request_timeout)
+        request_timeout = timeout if timeout is not None else api_config.read_timeout
+        timeouts = self._request_timeouts(request_timeout)
 
         last_error: Exception | None = None
 
@@ -306,7 +313,8 @@ class Client:
 
         Args:
             request_id: The prediction request ID.
-            timeout: Maximum wait time in seconds (None = no timeout).
+            timeout: Maximum wait time in seconds. None falls back to
+                ``api_config.timeout``, which defaults to None (no limit).
             poll_interval: Time between polls in seconds.
 
         Returns:
@@ -317,14 +325,15 @@ class Client:
             TimeoutError: If prediction times out.
         """
         start_time = time.time()
+        overall_timeout = timeout if timeout is not None else api_config.timeout
 
         while True:
             # Check timeout
-            if timeout is not None:
+            if overall_timeout is not None:
                 elapsed = time.time() - start_time
-                if elapsed >= timeout:
+                if elapsed >= overall_timeout:
                     raise TimeoutError(
-                        f"Prediction timed out after {timeout} seconds (task_id: {request_id})"
+                        f"Prediction timed out after {overall_timeout} seconds (task_id: {request_id})"
                     )
 
             result = self._get_result(request_id, timeout=timeout)
@@ -574,7 +583,7 @@ class Client:
 
         Args:
             file: File path string or file-like object to upload.
-            timeout: Total API call timeout in seconds.
+            timeout: Request timeout in seconds (default: no limit).
 
         Returns:
             URL of the uploaded file.
@@ -598,7 +607,7 @@ class Client:
         ticket_url = f"{self.base_url}/api/v3/media/uploads"
         headers = self._get_headers()
         timeout = timeout or api_config.timeout
-        request_timeout = (min(self.connection_timeout, timeout), timeout)
+        request_timeout = self._request_timeouts(timeout)
 
         close_stream = False
         if isinstance(file, str):

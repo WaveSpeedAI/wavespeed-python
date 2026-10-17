@@ -26,7 +26,8 @@ class TestApiConfig(unittest.TestCase):
         """Test the shipped default values."""
         self.assertEqual(api.base_url, "https://api.wavespeed.ai")
         self.assertEqual(api.connection_timeout, 10.0)
-        self.assertEqual(api.timeout, 36000.0)
+        self.assertIsNone(api.timeout)
+        self.assertEqual(api.read_timeout, 120.0)
         self.assertEqual(api.max_retries, 0)
         self.assertEqual(api.max_connection_retries, 5)
         self.assertEqual(api.retry_interval, 1.0)
