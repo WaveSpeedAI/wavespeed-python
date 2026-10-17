@@ -350,12 +350,17 @@ class Client:
         Returns:
             True if the error is retryable.
         """
-        # Only a failure reported by the task itself is re-run. Submission
-        # errors are ambiguous (the task may already exist), and poll-side HTTP
-        # errors, poll retry exhaustion and client-side wait timeouts all happen
-        # after the task was created and may be charged, so none of them may
-        # turn into another POST.
-        return isinstance(error, _TaskFailedError)
+        # Only a failure reported by the task itself is re-run, and only when it
+        # was a transient upstream error (HTTP 5xx / 429), as before: a
+        # deterministic failure such as a content-policy rejection would fail
+        # again. Submission errors are ambiguous (the task may already exist),
+        # and poll-side HTTP errors, poll retry exhaustion and client-side wait
+        # timeouts all happen after the task was created and may be charged, so
+        # none of them may turn into another POST.
+        if not isinstance(error, _TaskFailedError):
+            return False
+        error_str = str(error)
+        return "HTTP 5" in error_str or "HTTP 429" in error_str
 
     def _format_sync_mode_error(self, data: dict[str, Any]) -> str:
         """Build an actionable error for a non-completed sync-mode response."""

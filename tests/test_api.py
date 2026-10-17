@@ -203,13 +203,15 @@ class TestClient(unittest.TestCase):
     def test_task_retries_rerun_when_task_reports_failed(
         self, mock_post, mock_get, _mock_sleep
     ):
-        """A task that itself reports failed is re-run when max_retries > 0."""
+        """A task that fails with a transient upstream error is re-run when max_retries > 0."""
         mock_post.side_effect = [
             self._response(200, {"data": {"id": "req-1"}}),
             self._response(200, {"data": {"id": "req-2"}}),
         ]
         mock_get.side_effect = [
-            self._response(200, {"data": {"status": "failed", "error": "oom"}}),
+            self._response(
+                200, {"data": {"status": "failed", "error": "HTTP 500 upstream error"}}
+            ),
             self._response(200, {"data": {"status": "completed", "outputs": ["url"]}}),
         ]
 
@@ -218,6 +220,26 @@ class TestClient(unittest.TestCase):
 
         self.assertEqual(result, {"outputs": ["url"]})
         self.assertEqual(mock_post.call_count, 2)
+
+    @patch("wavespeed.api.client.time.sleep")
+    @patch("wavespeed.api.client.requests.get")
+    @patch("wavespeed.api.client.requests.post")
+    def test_task_retries_do_not_rerun_deterministic_failure(
+        self, mock_post, mock_get, _mock_sleep
+    ):
+        """A task that fails for a non-transient reason is not re-submitted."""
+        mock_post.side_effect = [self._response(200, {"data": {"id": "req-1"}})]
+        mock_get.side_effect = [
+            self._response(
+                200, {"data": {"status": "failed", "error": "content policy violation"}}
+            ),
+        ]
+
+        client = Client(api_key="test-key", max_retries=2)
+        with self.assertRaises(RuntimeError):
+            client.run("wavespeed-ai/z-image/turbo", {"prompt": "test"})
+
+        self.assertEqual(mock_post.call_count, 1)
 
     @patch("wavespeed.api.client.requests.get")
     def test_get_result_success(self, mock_get):
