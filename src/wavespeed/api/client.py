@@ -44,6 +44,10 @@ class _SubmissionError(RuntimeError):
     """A task submission failed and must not be retried automatically."""
 
 
+class _TaskFailedError(RuntimeError):
+    """The task itself reported status ``failed``; a task-level re-run is allowed."""
+
+
 class Client:
     """WaveSpeed API client.
 
@@ -332,14 +336,13 @@ class Client:
 
             if status in ("failed", "cancelled", "timeout", "deleted"):
                 error = data.get("error") or "Unknown error"
-                raise RuntimeError(
-                    f"Prediction {status} (task_id: {request_id}): {error}"
-                )
+                error_cls = _TaskFailedError if status == "failed" else RuntimeError
+                raise error_cls(f"Prediction {status} (task_id: {request_id}): {error}")
 
             time.sleep(poll_interval)
 
     def _is_retryable_error(self, error: Exception) -> bool:
-        """Determine if an error is worth retrying at the task level.
+        """Determine if an error is worth re-running the task for.
 
         Args:
             error: The exception to check.
@@ -347,29 +350,12 @@ class Client:
         Returns:
             True if the error is retryable.
         """
-        # Submission errors are ambiguous: the server may already have created
-        # the task, so never turn them into another POST automatically.
-        if isinstance(error, _SubmissionError):
-            return False
-
-        # Retry timeout and connection errors from result-query GETs.
-        if isinstance(
-            error,
-            (
-                requests.exceptions.Timeout,
-                requests.exceptions.ConnectionError,
-                TimeoutError,
-            ),
-        ):
-            return True
-
-        # Retry server errors (5xx) and rate limiting (429)
-        if isinstance(error, RuntimeError):
-            error_str = str(error)
-            if "HTTP 5" in error_str or "HTTP 429" in error_str:
-                return True
-
-        return False
+        # Only a failure reported by the task itself is re-run. Submission
+        # errors are ambiguous (the task may already exist), and poll-side HTTP
+        # errors, poll retry exhaustion and client-side wait timeouts all happen
+        # after the task was created and may be charged, so none of them may
+        # turn into another POST.
+        return isinstance(error, _TaskFailedError)
 
     def _format_sync_mode_error(self, data: dict[str, Any]) -> str:
         """Build an actionable error for a non-completed sync-mode response."""

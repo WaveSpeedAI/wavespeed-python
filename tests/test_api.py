@@ -149,6 +149,72 @@ class TestClient(unittest.TestCase):
 
         mock_post.assert_called_once()
 
+    @staticmethod
+    def _response(status_code, payload=None, text=""):
+        response = MagicMock()
+        response.status_code = status_code
+        response.text = text
+        response.json.return_value = payload
+        return response
+
+    @patch("wavespeed.api.client.time.sleep")
+    @patch("wavespeed.api.client.requests.get")
+    @patch("wavespeed.api.client.requests.post")
+    def test_task_retries_do_not_repost_after_poll_retry_exhaustion(
+        self, mock_post, mock_get, _mock_sleep
+    ):
+        """A poll that exhausts its GET retries must not create a second task."""
+        mock_post.return_value = self._response(200, {"data": {"id": "req-1"}})
+        mock_get.return_value = self._response(502, text="Bad Gateway")
+
+        client = Client(api_key="test-key", max_retries=2, max_connection_retries=1)
+        with self.assertRaises(RuntimeError) as ctx:
+            client.run("wavespeed-ai/z-image/turbo", {"prompt": "test"})
+
+        self.assertIn("req-1", str(ctx.exception))
+        self.assertIn("HTTP 502", str(ctx.exception))
+        self.assertEqual(mock_post.call_count, 1)
+        self.assertEqual(mock_get.call_count, 2)
+
+    @patch("wavespeed.api.client.time.sleep")
+    @patch("wavespeed.api.client.requests.get")
+    @patch("wavespeed.api.client.requests.post")
+    def test_task_retries_do_not_repost_after_wait_timeout(
+        self, mock_post, mock_get, _mock_sleep
+    ):
+        """A client-side wait timeout leaves the task alive and must not re-POST."""
+        mock_post.return_value = self._response(200, {"data": {"id": "req-1"}})
+        mock_get.return_value = self._response(200, {"data": {"status": "processing"}})
+
+        client = Client(api_key="test-key", max_retries=2)
+        with self.assertRaises(TimeoutError) as ctx:
+            client.run("wavespeed-ai/z-image/turbo", {"prompt": "test"}, timeout=0)
+
+        self.assertIn("req-1", str(ctx.exception))
+        self.assertEqual(mock_post.call_count, 1)
+
+    @patch("wavespeed.api.client.time.sleep")
+    @patch("wavespeed.api.client.requests.get")
+    @patch("wavespeed.api.client.requests.post")
+    def test_task_retries_rerun_when_task_reports_failed(
+        self, mock_post, mock_get, _mock_sleep
+    ):
+        """A task that itself reports failed is re-run when max_retries > 0."""
+        mock_post.side_effect = [
+            self._response(200, {"data": {"id": "req-1"}}),
+            self._response(200, {"data": {"id": "req-2"}}),
+        ]
+        mock_get.side_effect = [
+            self._response(200, {"data": {"status": "failed", "error": "oom"}}),
+            self._response(200, {"data": {"status": "completed", "outputs": ["url"]}}),
+        ]
+
+        client = Client(api_key="test-key", max_retries=1)
+        result = client.run("wavespeed-ai/z-image/turbo", {"prompt": "test"})
+
+        self.assertEqual(result, {"outputs": ["url"]})
+        self.assertEqual(mock_post.call_count, 2)
+
     @patch("wavespeed.api.client.requests.get")
     def test_get_result_success(self, mock_get):
         """Test successful result retrieval."""
