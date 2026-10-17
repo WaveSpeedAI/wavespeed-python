@@ -176,6 +176,10 @@ class TestClient(unittest.TestCase):
         self.assertEqual(mock_post.call_count, 1)
         self.assertEqual(mock_get.call_count, 2)
 
+        result = client.run_no_throw("wavespeed-ai/z-image/turbo", {"prompt": "test"})
+        self.assertEqual(result["task_id"], "req-1")
+        self.assertEqual(mock_post.call_count, 2)  # one POST per run, never per poll
+
     @patch("wavespeed.api.client.time.sleep")
     @patch("wavespeed.api.client.requests.get")
     @patch("wavespeed.api.client.requests.post")

@@ -450,8 +450,10 @@ class Client:
     @staticmethod
     def _task_id_from_error(error: Exception) -> str:
         """Extract a task ID from an error message, mirroring the JS SDK."""
-        match = re.search(r"task_id:\s*([^)]+)", str(error))
-        return match.group(1).strip() if match else "unknown"
+        match = re.search(r"task_id:\s*([^)]+)|for task ([^\s:]+)", str(error))
+        if not match:
+            return "unknown"
+        return (match.group(1) or match.group(2)).strip()
 
     def run_no_throw(
         self,
